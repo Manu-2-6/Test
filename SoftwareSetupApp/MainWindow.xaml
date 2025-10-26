@@ -22,13 +22,19 @@
         </StackPanel>
 
         <Border Grid.Row="1" Padding="12" CornerRadius="8" Background="#F4F6FB" BorderBrush="#D0D6E2" BorderThickness="1">
-            <StackPanel>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
                 <CheckBox x:Name="SelectAllCheckBox"
+                          Grid.Row="0"
                           Content="Tout sélectionner"
                           Margin="0 0 0 8"
                           IsThreeState="True"
                           Click="SelectAllCheckBox_Click" />
                 <ListView x:Name="PackagesList"
+                          Grid.Row="1"
                           ItemsSource="{Binding Packages}"
                           BorderThickness="0">
                     <ListView.Resources>
@@ -52,7 +58,7 @@
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
-            </StackPanel>
+            </Grid>
         </Border>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 16 0 16">
