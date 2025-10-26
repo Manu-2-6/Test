@@ -8,15 +8,18 @@ public class SoftwarePackage : INotifyPropertyChanged
     private bool _isSelected;
     private string _status = "Prêt";
 
-    public SoftwarePackage(string name, string packageId)
+    public SoftwarePackage(string name, string packageId, string logoKey)
     {
         Name = name;
         PackageId = packageId;
+        LogoKey = logoKey;
     }
 
     public string Name { get; }
 
     public string PackageId { get; }
+
+    public string LogoKey { get; }
 
     public bool IsSelected
     {

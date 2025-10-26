@@ -37,9 +37,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         InitializeComponent();
         DataContext = this;
 
-        Packages.Add(new SoftwarePackage("VLC", "VideoLAN.VLC"));
-        Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome"));
-        Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
+        Packages.Add(new SoftwarePackage("VLC", "VideoLAN.VLC", "vlc"));
+        Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome", "chrome"));
+        Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit", "acrobat"));
 
         foreach (var package in Packages)
         {
