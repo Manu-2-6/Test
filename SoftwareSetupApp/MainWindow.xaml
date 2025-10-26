@@ -27,6 +27,7 @@
                           Content="Tout sélectionner"
                           Margin="0 0 0 8"
                           IsThreeState="True"
+                          PreviewMouseLeftButtonDown="SelectAllCheckBox_PreviewMouseLeftButtonDown"
                           Checked="SelectAllCheckBox_Checked"
                           Unchecked="SelectAllCheckBox_Unchecked"
                           Indeterminate="SelectAllCheckBox_Indeterminate" />

@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using SoftwareSetupApp.Models;
 using SoftwareSetupApp.Services;
 
@@ -130,6 +132,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void SelectAllCheckBox_Indeterminate(object sender, RoutedEventArgs e)
     {
         // No direct action required when indeterminate, state is controlled by individual selections.
+    }
+
+    private void SelectAllCheckBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not CheckBox checkBox)
+        {
+            return;
+        }
+
+        var selectedCount = Packages.Count(p => p.IsSelected);
+        if (selectedCount > 0 && selectedCount < Packages.Count && checkBox.IsChecked == null)
+        {
+            checkBox.IsChecked = false;
+            e.Handled = true;
+        }
     }
 
     private void PackageOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
