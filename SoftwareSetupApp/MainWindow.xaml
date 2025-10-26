@@ -178,6 +178,7 @@
                          BorderThickness="0"
                          Background="#FF000000"
                          Foreground="#FFFFFFFF"
+                         MinHeight="120"
                          Loaded="LogListBox_OnLoaded"
                          Unloaded="LogListBox_OnUnloaded" />
             </DockPanel>
