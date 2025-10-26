@@ -358,6 +358,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 continue;
             }
 
+            if (!HasMeaningfulContentAfterAppTag(trimmed))
+            {
+                continue;
+            }
+
             if (string.Equals(trimmed, _lastLogEntry, StringComparison.Ordinal))
             {
                 continue;
@@ -430,6 +435,29 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         return true;
+    }
+
+    private static bool HasMeaningfulContentAfterAppTag(string line)
+    {
+        var closingBracketIndex = line.IndexOf(']');
+        if (closingBracketIndex < 0)
+        {
+            return true;
+        }
+
+        var openingBracketIndex = line.LastIndexOf('[', closingBracketIndex);
+        if (openingBracketIndex < 0)
+        {
+            return true;
+        }
+
+        if (closingBracketIndex >= line.Length - 1)
+        {
+            return false;
+        }
+
+        var afterTag = line.Substring(closingBracketIndex + 1).Trim();
+        return afterTag.Length >= 2;
     }
 
     private void LogsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
