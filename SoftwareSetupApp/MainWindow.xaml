@@ -176,6 +176,8 @@
                 <ListBox x:Name="LogListBox"
                          ItemsSource="{Binding Logs}"
                          BorderThickness="0"
+                         Background="#FF000000"
+                         Foreground="#FFFFFFFF"
                          Loaded="LogListBox_OnLoaded"
                          Unloaded="LogListBox_OnUnloaded" />
             </DockPanel>
