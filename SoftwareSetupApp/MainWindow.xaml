@@ -16,9 +16,9 @@
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="2*" />
+            <RowDefinition Height="3*" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="2*" />
         </Grid.RowDefinitions>
 
         <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0 0 0 16">
@@ -178,7 +178,7 @@
                          BorderThickness="0"
                          Background="#FF000000"
                          Foreground="#FFFFFFFF"
-                         MinHeight="120"
+                         MinHeight="180"
                          Loaded="LogListBox_OnLoaded"
                          Unloaded="LogListBox_OnUnloaded" />
             </DockPanel>
