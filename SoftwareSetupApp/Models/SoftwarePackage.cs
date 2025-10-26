@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -8,6 +9,7 @@ public class SoftwarePackage : INotifyPropertyChanged
     private bool _isSelected;
     private string _status = "Prêt";
     private string? _logoPath;
+    private int _progress;
 
     public SoftwarePackage(string name, string packageId)
     {
@@ -56,6 +58,20 @@ public class SoftwarePackage : INotifyPropertyChanged
             if (_status != value)
             {
                 _status = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public int Progress
+    {
+        get => _progress;
+        set
+        {
+            var clamped = Math.Max(0, Math.Min(100, value));
+            if (_progress != clamped)
+            {
+                _progress = clamped;
                 OnPropertyChanged();
             }
         }

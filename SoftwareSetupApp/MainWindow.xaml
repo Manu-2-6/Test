@@ -55,7 +55,7 @@
                             <Grid Margin="0 4">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="220" />
                                 </Grid.ColumnDefinitions>
                                 <Grid Margin="0" VerticalAlignment="Center">
                                     <Grid.ColumnDefinitions>
@@ -114,11 +114,33 @@
                                                FontWeight="SemiBold"
                                                Foreground="#1F2933" />
                                 </Grid>
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding Status}"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           Foreground="#2F73DA" />
+                                <Grid Grid.Column="1"
+                                      Margin="12 0 0 0"
+                                      VerticalAlignment="Center">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid Grid.Row="0"
+                                          Height="20"
+                                          VerticalAlignment="Center">
+                                        <ProgressBar Minimum="0"
+                                                     Maximum="100"
+                                                     Value="{Binding Progress}"
+                                                     Height="20"
+                                                     VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding Progress, StringFormat={}{0}%}"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#1F2933" />
+                                    </Grid>
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding Status}"
+                                               HorizontalAlignment="Right"
+                                               Margin="0 4 0 0"
+                                               Foreground="#2F73DA" />
+                                </Grid>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>

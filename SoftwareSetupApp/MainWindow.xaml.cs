@@ -91,6 +91,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var package in selectedPackages)
         {
             package.Status = "Installation en cours...";
+            package.Progress = 0;
+            progress.Report($"[{package.Name}] Démarrage de l'installation.");
             await InstallPackageAsync(package, progress);
         }
 
@@ -159,10 +161,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         try
         {
-            var result = await _installer.InstallAsync(package, progress, CancellationToken.None);
+            var percentProgress = new Progress<int>(value => package.Progress = value);
+            var result = await _installer.InstallAsync(package, progress, percentProgress, CancellationToken.None);
             package.Status = result.IsSuccess
                 ? "Installé"
                 : "Échec";
+
+            if (result.IsSuccess)
+            {
+                package.Progress = 100;
+                progress.Report($"[{package.Name}] Installation terminée.");
+            }
 
             if (!string.IsNullOrWhiteSpace(result.Message))
             {
@@ -172,6 +181,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         catch (Exception ex)
         {
             package.Status = "Erreur";
+            package.Progress = 0;
             progress.Report($"[{package.Name}] {ex.Message}");
         }
     }
