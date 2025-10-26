@@ -394,7 +394,7 @@ public class WindowsCustomizationService
                 {
                     foreach (var association in ChromeAssociations)
                     {
-                        var associationType = association.StartsWith('.', StringComparison.Ordinal)
+                        var associationType = association.StartsWith(".", StringComparison.Ordinal)
                             ? ASSOCIATIONTYPE.AT_FILEEXTENSION
                             : ASSOCIATIONTYPE.AT_URLPROTOCOL;
                         var setHr = registration.SetAppAsDefault(chromeRegisteredName, association, associationType);
