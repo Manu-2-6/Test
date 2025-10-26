@@ -16,7 +16,7 @@
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="3*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="2*" />
         </Grid.RowDefinitions>
@@ -178,6 +178,7 @@
                          BorderThickness="0"
                          Background="#FF000000"
                          Foreground="#FFFFFFFF"
+                         MinHeight="180"
                          Loaded="LogListBox_OnLoaded"
                          Unloaded="LogListBox_OnUnloaded" />
             </DockPanel>
