@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace SoftwareSetupApp.Models;
@@ -11,16 +13,38 @@ public class SoftwarePackage : INotifyPropertyChanged
     private string? _logoPath;
     private int _progress;
     private bool _isProgressVisible;
+    private readonly List<DefaultAssociation> _defaultAssociations;
+    private bool _isDefaultAppSelected = true;
 
-    public SoftwarePackage(string name, string packageId)
+    public SoftwarePackage(
+        string name,
+        string packageId,
+        IEnumerable<DefaultAssociation>? defaultAssociations = null,
+        ChromeCustomizationOptions? chromeOptions = null)
     {
         Name = name;
         PackageId = packageId;
+        _defaultAssociations = defaultAssociations?.ToList() ?? new List<DefaultAssociation>();
+        ChromeOptions = chromeOptions;
+        if (!SupportsDefaultApp)
+        {
+            _isDefaultAppSelected = false;
+        }
     }
 
     public string Name { get; }
 
     public string PackageId { get; }
+
+    public bool SupportsDefaultApp => _defaultAssociations.Count > 0;
+
+    public bool HasCustomOptions => SupportsDefaultApp || ChromeOptions != null;
+
+    public bool HasChromeOptions => ChromeOptions != null;
+
+    public IReadOnlyList<DefaultAssociation> DefaultAssociations => _defaultAssociations;
+
+    public ChromeCustomizationOptions? ChromeOptions { get; }
 
     public string? LogoPath
     {
@@ -46,6 +70,19 @@ public class SoftwarePackage : INotifyPropertyChanged
             if (_isSelected != value)
             {
                 _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public bool IsDefaultAppSelected
+    {
+        get => _isDefaultAppSelected;
+        set
+        {
+            if (_isDefaultAppSelected != value)
+            {
+                _isDefaultAppSelected = value;
                 OnPropertyChanged();
             }
         }

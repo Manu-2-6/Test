@@ -29,6 +29,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         new("[\\p{L}\\p{Nd}]+(?:[\\p{L}\\p{Nd}\\p{P}]*[\\p{L}\\p{Nd}]+)?", RegexOptions.Compiled);
 
     private readonly WingetInstaller _installer = new();
+    private readonly WindowsCustomizationService _customizationService = new();
     private readonly List<string> _logoDirectories;
     private bool _isInstalling;
     private CancellationTokenSource? _installationCts;
@@ -86,10 +87,45 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Directory.CreateDirectory(directory);
         }
 
-        Packages.Add(new SoftwarePackage("VLC", "VideoLAN.VLC"));
-        Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome"));
-        Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
-        Packages.Add(new SoftwarePackage("LibreOffice", "TheDocumentFoundation.LibreOffice"));
+        var vlcAssociations = new[]
+        {
+            new DefaultAssociation(".mp4", "VLC.mp4", "VLC media player"),
+            new DefaultAssociation(".mkv", "VLC.mkv", "VLC media player"),
+            new DefaultAssociation(".avi", "VLC.avi", "VLC media player"),
+            new DefaultAssociation(".mp3", "VLC.mp3", "VLC media player"),
+            new DefaultAssociation(".wav", "VLC.wav", "VLC media player"),
+            new DefaultAssociation(".flac", "VLC.flac", "VLC media player")
+        };
+
+        var chromeAssociations = new[]
+        {
+            new DefaultAssociation(".htm", "ChromeHTML", "Google Chrome"),
+            new DefaultAssociation(".html", "ChromeHTML", "Google Chrome"),
+            new DefaultAssociation("http", "ChromeHTML", "Google Chrome"),
+            new DefaultAssociation("https", "ChromeHTML", "Google Chrome")
+        };
+
+        var acrobatAssociations = new[]
+        {
+            new DefaultAssociation(".pdf", "AcroExch.Document.DC", "Adobe Acrobat Reader")
+        };
+
+        var libreOfficeAssociations = new[]
+        {
+            new DefaultAssociation(".odt", "LibreOffice.WriterDocument.1", "LibreOffice"),
+            new DefaultAssociation(".docx", "LibreOffice.WriterDocument.1", "LibreOffice"),
+            new DefaultAssociation(".ods", "LibreOffice.CalcDocument.1", "LibreOffice"),
+            new DefaultAssociation(".xlsx", "LibreOffice.CalcDocument.1", "LibreOffice"),
+            new DefaultAssociation(".odp", "LibreOffice.ImpressDocument.1", "LibreOffice"),
+            new DefaultAssociation(".pptx", "LibreOffice.ImpressDocument.1", "LibreOffice")
+        };
+
+        var chromeOptions = new ChromeCustomizationOptions();
+
+        Packages.Add(new SoftwarePackage("VLC", "VideoLAN.VLC", vlcAssociations));
+        Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome", chromeAssociations, chromeOptions));
+        Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit", acrobatAssociations));
+        Packages.Add(new SoftwarePackage("LibreOffice", "TheDocumentFoundation.LibreOffice", libreOfficeAssociations));
 
         foreach (var package in Packages)
         {
@@ -163,6 +199,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 {
                     wasCancelled = true;
                     CancelButton.IsEnabled = false;
+                }
+
+                if (!wasCancelled && result.IsSuccess)
+                {
+                    try
+                    {
+                        await _customizationService.ApplyAsync(package, progress, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        progress.Report($"[{package.Name}] Erreur lors de la configuration post-installation : {ex.Message}");
+                    }
                 }
 
                 if (wasCancelled)

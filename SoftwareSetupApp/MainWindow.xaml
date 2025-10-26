@@ -16,9 +16,9 @@
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="2*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0 0 0 16">
@@ -53,11 +53,16 @@
                     <ListView.ItemTemplate>
                         <DataTemplate DataType="{x:Type models:SoftwarePackage}">
                             <Grid Margin="0 4">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="220" />
                                 </Grid.ColumnDefinitions>
-                                <Grid Margin="0" VerticalAlignment="Center">
+
+                                <Grid Grid.Row="0" Grid.Column="0" Margin="0" VerticalAlignment="Center">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
@@ -114,7 +119,9 @@
                                                FontWeight="SemiBold"
                                                Foreground="#1F2933" />
                                 </Grid>
-                                <Grid Grid.Column="1"
+
+                                <Grid Grid.Row="0"
+                                      Grid.Column="1"
                                       Margin="12 0 0 0"
                                       VerticalAlignment="Center">
                                     <Grid.RowDefinitions>
@@ -142,6 +149,35 @@
                                                Margin="0 4 0 0"
                                                Foreground="#2F73DA" />
                                 </Grid>
+
+                                <Expander Grid.Row="1"
+                                          Grid.ColumnSpan="2"
+                                          Margin="44 8 0 0"
+                                          IsExpanded="True"
+                                          Visibility="{Binding HasCustomOptions, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                          Header="Options d'installation">
+                                    <StackPanel Margin="0 8 0 0">
+                                        <CheckBox Content="Définir comme application par défaut"
+                                                  Margin="0 0 0 4"
+                                                  IsChecked="{Binding IsDefaultAppSelected, Mode=TwoWay}"
+                                                  Visibility="{Binding SupportsDefaultApp, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        <StackPanel Margin="24 4 0 0"
+                                                    DataContext="{Binding ChromeOptions}"
+                                                    Visibility="{Binding DataContext.HasChromeOptions, RelativeSource={RelativeSource AncestorType=Expander}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <CheckBox Content="Épingler Google Chrome à la barre des tâches"
+                                                      Margin="0 0 0 4"
+                                                      IsChecked="{Binding PinToTaskbar, Mode=TwoWay}" />
+                                            <CheckBox Content="Définir google.com comme page d'accueil"
+                                                      Margin="0 0 0 4"
+                                                      IsChecked="{Binding ConfigureHomepage, Mode=TwoWay}" />
+                                            <CheckBox Content="Afficher la barre des favoris"
+                                                      Margin="0 0 0 4"
+                                                      IsChecked="{Binding ShowBookmarksBar, Mode=TwoWay}" />
+                                            <CheckBox Content="Ajouter Google (google.com) à la barre des favoris"
+                                                      IsChecked="{Binding AddGoogleBookmark, Mode=TwoWay}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Expander>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>
