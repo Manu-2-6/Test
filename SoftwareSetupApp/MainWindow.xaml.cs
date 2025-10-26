@@ -17,7 +17,7 @@ namespace SoftwareSetupApp;
 
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
-    private static readonly Regex AnsiRegex = new("\x1B\[[0-9;]*[A-Za-z]", RegexOptions.Compiled);
+    private static readonly Regex AnsiRegex = new("\x1B\\[[0-9;]*[A-Za-z]", RegexOptions.Compiled);
 
     private readonly WingetInstaller _installer = new();
     private readonly List<string> _logoDirectories;
