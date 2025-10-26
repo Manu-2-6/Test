@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -15,7 +16,7 @@ namespace SoftwareSetupApp;
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
     private readonly WingetInstaller _installer = new();
-    private readonly string _logosDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Logos");
+    private readonly List<string> _logoDirectories;
     private bool _isInstalling;
 
     public ObservableCollection<SoftwarePackage> Packages { get; } = new();
@@ -39,7 +40,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         InitializeComponent();
         DataContext = this;
 
-        Directory.CreateDirectory(_logosDirectory);
+        _logoDirectories = BuildLogoDirectories();
+
+        foreach (var directory in _logoDirectories)
+        {
+            Directory.CreateDirectory(directory);
+        }
 
         Packages.Add(new SoftwarePackage("VLC", "VideoLAN.VLC"));
         Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome"));
@@ -97,6 +103,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         UpdateSelectAllState();
     }
 
+    private List<string> BuildLogoDirectories()
+    {
+        var directories = new List<string>();
+
+        var baseDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Logos");
+        directories.Add(baseDirectory);
+
+        var projectDirectory = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Assets", "Logos"));
+        if (!directories.Contains(projectDirectory) && Directory.Exists(projectDirectory))
+        {
+            directories.Add(projectDirectory);
+        }
+
+        return directories;
+    }
+
     private void LoadPackageLogos()
     {
         foreach (var package in Packages)
@@ -107,23 +129,26 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private string? FindLogoForPackage(string packageName)
     {
-        if (!Directory.Exists(_logosDirectory))
-        {
-            return null;
-        }
-
         var normalized = packageName?.Trim();
         if (string.IsNullOrWhiteSpace(normalized))
         {
             return null;
         }
 
-        foreach (var filePath in Directory.EnumerateFiles(_logosDirectory))
+        foreach (var directory in _logoDirectories)
         {
-            var fileName = Path.GetFileNameWithoutExtension(filePath);
-            if (fileName != null && string.Equals(fileName, normalized, StringComparison.OrdinalIgnoreCase))
+            if (!Directory.Exists(directory))
             {
-                return filePath;
+                continue;
+            }
+
+            foreach (var filePath in Directory.EnumerateFiles(directory))
+            {
+                var fileName = Path.GetFileNameWithoutExtension(filePath);
+                if (fileName != null && string.Equals(fileName, normalized, StringComparison.OrdinalIgnoreCase))
+                {
+                    return filePath;
+                }
             }
         }
 
