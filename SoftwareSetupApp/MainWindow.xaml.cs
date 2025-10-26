@@ -515,6 +515,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
+    private void CopyLogButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (Logs.Count == 0)
+        {
+            MessageBox.Show("Le journal est vide.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var logContent = string.Join(Environment.NewLine, Logs);
+
+        try
+        {
+            Clipboard.SetText(logContent);
+            MessageBox.Show("Le journal a été copié dans le presse-papiers.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Impossible de copier le journal : {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
     {
         var childCount = VisualTreeHelper.GetChildrenCount(parent);

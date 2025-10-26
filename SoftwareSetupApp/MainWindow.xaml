@@ -162,7 +162,17 @@
 
         <Border Grid.Row="3" Padding="12" CornerRadius="8" Background="#FFFFFF" BorderBrush="#D0D6E2" BorderThickness="1">
             <DockPanel>
-                <TextBlock Text="Journal" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0 0 0 8" />
+                <DockPanel DockPanel.Dock="Top" Margin="0 0 0 8" LastChildFill="False">
+                    <TextBlock Text="Journal"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center" />
+                    <Button x:Name="CopyLogButton"
+                            Content="Copier le journal"
+                            Margin="12 0 0 0"
+                            Padding="12 4"
+                            Click="CopyLogButton_OnClick"
+                            VerticalAlignment="Center" />
+                </DockPanel>
                 <ListBox x:Name="LogListBox"
                          ItemsSource="{Binding Logs}"
                          BorderThickness="0"
