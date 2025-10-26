@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -120,23 +121,26 @@ public class WindowsCustomizationService
         var chromePath = FindChromeExecutable();
         if (package.IsDefaultAppSelected && chromePath != null)
         {
-            progress.Report("[Google Chrome] Définition comme navigateur par défaut...");
-            var startInfo = new ProcessStartInfo
+            if (!TrySetChromeAsDefaultBrowser(progress))
             {
-                FileName = chromePath,
-                Arguments = "--make-default-browser",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
+                progress.Report("[Google Chrome] Tentative via Chrome (--make-default-browser)...");
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = chromePath,
+                    Arguments = "--make-default-browser",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                };
 
-            var exitCode = await RunProcessAsync(startInfo, progress, package.Name, cancellationToken).ConfigureAwait(false);
-            if (exitCode != 0)
-            {
-                progress.Report("[Google Chrome] Impossible de définir le navigateur par défaut via la ligne de commande.");
+                var exitCode = await RunProcessAsync(startInfo, progress, package.Name, cancellationToken).ConfigureAwait(false);
+                if (exitCode != 0)
+                {
+                    progress.Report("[Google Chrome] Impossible de définir le navigateur par défaut via la ligne de commande.");
+                }
             }
         }
         else if (package.IsDefaultAppSelected)
@@ -148,25 +152,39 @@ public class WindowsCustomizationService
 
         if (options.PinToTaskbar)
         {
-            const string script = @"
-$appsFolder = (New-Object -ComObject Shell.Application).Namespace('shell:Appsfolder')
-if ($appsFolder) {
-    $chromeApp = $appsFolder.ParseName('Google Chrome')
-    if ($chromeApp) {
-        try {
-            $chromeApp.InvokeVerb('taskbarpin')
-        } catch {
-            foreach ($verb in $chromeApp.Verbs()) {
-                $name = $verb.Name.Replace('&', '')
-                if ($verb.Verb -eq 'taskbarpin' -or $name -match 'taskbar' -or $name -match 'barre des taches' -or $name -match 'barre des tâches') {
-                    $verb.DoIt()
-                    break
-                }
-            }
-        }
-    }
-}
-";
+            var scriptBuilder = new StringBuilder();
+            scriptBuilder.AppendLine("$chromePath = [System.IO.Path]::Combine($env:ProgramFiles, 'Google', 'Chrome', 'Application', 'chrome.exe')");
+            scriptBuilder.AppendLine("if (-not (Test-Path $chromePath)) { $chromePath = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, 'Google', 'Chrome', 'Application', 'chrome.exe') }");
+            scriptBuilder.AppendLine("if (Test-Path $chromePath) {");
+            scriptBuilder.AppendLine("    $taskbarFolder = Join-Path $env:AppData 'Microsoft\\Internet Explorer\\Quick Launch\\User Pinned\\TaskBar'");
+            scriptBuilder.AppendLine("    New-Item -ItemType Directory -Force -Path $taskbarFolder | Out-Null");
+            scriptBuilder.AppendLine("    $shortcutPath = Join-Path $taskbarFolder 'Google Chrome.lnk'");
+            scriptBuilder.AppendLine("    $wsh = New-Object -ComObject WScript.Shell");
+            scriptBuilder.AppendLine("    $shortcut = $wsh.CreateShortcut($shortcutPath)");
+            scriptBuilder.AppendLine("    $shortcut.TargetPath = $chromePath");
+            scriptBuilder.AppendLine("    $shortcut.IconLocation = \"$chromePath,0\"");
+            scriptBuilder.AppendLine("    $shortcut.WorkingDirectory = [System.IO.Path]::GetDirectoryName($chromePath)");
+            scriptBuilder.AppendLine("    $shortcut.Save()");
+            scriptBuilder.AppendLine("    $shell = New-Object -ComObject Shell.Application");
+            scriptBuilder.AppendLine("    $appsFolder = $shell.Namespace('shell:Appsfolder')");
+            scriptBuilder.AppendLine("    if ($appsFolder) {");
+            scriptBuilder.AppendLine("        $chromeItems = @()");
+            scriptBuilder.AppendLine("        foreach ($item in $appsFolder.Items()) {");
+            scriptBuilder.AppendLine("            if ($item.Name -match 'Chrome' -or $item.Path -like '*chrome.exe') {");
+            scriptBuilder.AppendLine("                $chromeItems += $item");
+            scriptBuilder.AppendLine("            }");
+            scriptBuilder.AppendLine("        }");
+            scriptBuilder.AppendLine("        foreach ($chromeApp in $chromeItems) {");
+            scriptBuilder.AppendLine("            foreach ($verb in $chromeApp.Verbs()) {");
+            scriptBuilder.AppendLine("                $name = $verb.Name.Replace('&', '')");
+            scriptBuilder.AppendLine("                if ($verb.Verb -eq 'taskbarpin' -or $name -match 'taskbar' -or $name -match 'barre des taches' -or $name -match 'barre des tâches') {");
+            scriptBuilder.AppendLine("                    try { $verb.DoIt() } catch {}");
+            scriptBuilder.AppendLine("                }");
+            scriptBuilder.AppendLine("            }");
+            scriptBuilder.AppendLine("        }");
+            scriptBuilder.AppendLine("    }");
+            scriptBuilder.AppendLine("}");
+            var script = scriptBuilder.ToString();
             progress.Report("[Google Chrome] Épinglage à la barre des tâches...");
             await RunPowerShellAsync(script, progress, package.Name, cancellationToken).ConfigureAwait(false);
         }
@@ -201,6 +219,7 @@ if ($appsFolder) {
                 scriptBuilder.AppendLine($"New-ItemProperty -Path $chromePolicy -Name 'ManagedBookmarks' -PropertyType String -Value \"{bookmarksJson}\" -Force | Out-Null");
             }
 
+            scriptBuilder.AppendLine("gpupdate.exe /target:user /force | Out-Null");
             progress.Report("[Google Chrome] Application des paramètres de page d'accueil et de favoris...");
             await RunPowerShellAsync(scriptBuilder.ToString(), progress, package.Name, cancellationToken).ConfigureAwait(false);
         }
@@ -224,6 +243,52 @@ if ($appsFolder) {
         }
 
         return null;
+    }
+
+    private static bool TrySetChromeAsDefaultBrowser(IProgress<string> progress)
+    {
+        try
+        {
+            var registrationType = Type.GetTypeFromCLSID(ApplicationAssociationRegistrationClsid);
+            if (registrationType == null)
+            {
+                return false;
+            }
+
+            if (Activator.CreateInstance(registrationType) is not IApplicationAssociationRegistration registration)
+            {
+                return false;
+            }
+
+            try
+            {
+                const string chromeRegisteredName = "Google Chrome";
+                if (registration.QueryAppIsDefaultAll(chromeRegisteredName, ASSOCIATIONLEVEL.AL_EFFECTIVE, out var isDefault) == 0 && isDefault)
+                {
+                    progress.Report("[Google Chrome] Navigateur par défaut déjà défini.");
+                    return true;
+                }
+
+                var hr = registration.SetAppAsDefaultAll(chromeRegisteredName);
+                if (hr == 0)
+                {
+                    progress.Report("[Google Chrome] Navigateur par défaut défini via l'API Windows.");
+                    return true;
+                }
+
+                Marshal.ThrowExceptionForHR(hr);
+            }
+            finally
+            {
+                Marshal.ReleaseComObject(registration);
+            }
+        }
+        catch (Exception ex)
+        {
+            progress.Report($"[Google Chrome] Impossible d'utiliser l'API Windows : {ex.Message}.");
+        }
+
+        return false;
     }
 
     private static ProcessStartInfo CreatePowerShellStartInfo(string script)
@@ -324,5 +389,35 @@ if ($appsFolder) {
             progress.Report($"[{packageName}] L'exécutable '{startInfo.FileName}' est introuvable.");
             return -1;
         }
+    }
+
+    private static readonly Guid ApplicationAssociationRegistrationClsid = new("591209C7-767B-42B2-9FBA-44EE4615F2C7");
+
+    [ComImport]
+    [Guid("1F76A169-F994-40AC-8FC8-0959E8874710")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IApplicationAssociationRegistration
+    {
+        int QueryCurrentDefault([MarshalAs(UnmanagedType.LPWStr)] string pszQuery, ASSOCIATIONTYPE at, ASSOCIATIONLEVEL al, [MarshalAs(UnmanagedType.LPWStr)] out string ppszAssociation);
+        int QueryAppIsDefault([MarshalAs(UnmanagedType.LPWStr)] string pszAppRegistryName, ASSOCIATIONTYPE at, ASSOCIATIONLEVEL al, [MarshalAs(UnmanagedType.Bool)] out bool pfDefault);
+        int QueryAppIsDefaultAll([MarshalAs(UnmanagedType.LPWStr)] string pszAppRegistryName, ASSOCIATIONLEVEL al, [MarshalAs(UnmanagedType.Bool)] out bool pfDefault);
+        int SetAppAsDefault([MarshalAs(UnmanagedType.LPWStr)] string pszAppRegistryName, [MarshalAs(UnmanagedType.LPWStr)] string pszSet, ASSOCIATIONTYPE at);
+        int SetAppAsDefaultAll([MarshalAs(UnmanagedType.LPWStr)] string pszAppRegistryName);
+        int ClearUserAssociations();
+    }
+
+    private enum ASSOCIATIONTYPE
+    {
+        AT_FILEEXTENSION,
+        AT_URLPROTOCOL,
+        AT_STARTMENUCLIENT,
+        AT_MIMETYPE
+    }
+
+    private enum ASSOCIATIONLEVEL
+    {
+        AL_MACHINE,
+        AL_EFFECTIVE,
+        AL_USER
     }
 }
