@@ -23,6 +23,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private static readonly Regex AnsiRegex = new("\x1B\\[[0-9;]*[A-Za-z]", RegexOptions.Compiled);
     private static readonly Regex BlockGlyphRegex = new("[\\u2500-\\u259F\\u25A0-\\u25FF\\u2B00-\\u2BFF]+", RegexOptions.Compiled);
     private static readonly Regex ExtraWhitespaceRegex = new("\\s{2,}", RegexOptions.Compiled);
+    private static readonly Regex SimpleProgressBarRegex = new("[#=><\\-\\|]{3,}", RegexOptions.Compiled);
+    private static readonly Regex BrokenUtf8GlyphRegex = new("â[\\u0080-\\u00FF]", RegexOptions.Compiled);
+    private static readonly Regex UsefulContentRegex =
+        new("[\\p{L}\\p{Nd}]+(?:[\\p{L}\\p{Nd}\\p{P}]*[\\p{L}\\p{Nd}]+)?", RegexOptions.Compiled);
 
     private readonly WingetInstaller _installer = new();
     private readonly List<string> _logoDirectories;
@@ -290,6 +294,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (result.IsSuccess)
             {
                 smoother.Complete();
+                await smoother.WaitForCompletionAsync();
                 package.Status = "Installé";
                 progress.Report($"[{package.Name}] Installation terminée.");
                 return result;
@@ -348,6 +353,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 continue;
             }
 
+            if (!IsUsefulLogLine(trimmed))
+            {
+                continue;
+            }
+
             if (string.Equals(trimmed, _lastLogEntry, StringComparison.Ordinal))
             {
                 continue;
@@ -376,9 +386,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return string.Empty;
         }
 
-        var withoutAnsi = AnsiRegex.Replace(message, string.Empty);
+        var normalizedMessage = message.Normalize(NormalizationForm.FormKC);
+        var withoutAnsi = AnsiRegex.Replace(normalizedMessage, string.Empty);
         var withoutBlocks = BlockGlyphRegex.Replace(withoutAnsi, string.Empty);
-        var cleaned = withoutBlocks.Replace("\r", string.Empty);
+        var withoutBrokenGlyphs = BrokenUtf8GlyphRegex.Replace(withoutBlocks, string.Empty);
+        var cleaned = withoutBrokenGlyphs.Replace("\r", string.Empty);
         var builder = new StringBuilder(cleaned.Length);
 
         foreach (var ch in cleaned)
@@ -389,8 +401,35 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
         }
 
-        var normalized = ExtraWhitespaceRegex.Replace(builder.ToString(), " ");
+        var withoutProgressBars = SimpleProgressBarRegex.Replace(builder.ToString(), string.Empty);
+        var normalized = ExtraWhitespaceRegex.Replace(withoutProgressBars, " ");
         return normalized.Trim();
+    }
+
+    private static bool IsUsefulLogLine(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return false;
+        }
+
+        if (!UsefulContentRegex.IsMatch(line))
+        {
+            return false;
+        }
+
+        var withoutDelimiters = line.Trim('[', ']', '|', '›', '«', '»', '·', '-', '=', ':');
+        if (string.IsNullOrWhiteSpace(withoutDelimiters))
+        {
+            return false;
+        }
+
+        if (!line.Any(char.IsWhiteSpace) && withoutDelimiters.Length <= 4)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private void LogsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -472,47 +511,75 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         private readonly SoftwarePackage _package;
         private readonly DispatcherTimer _timer;
+        private readonly TimeSpan _tickInterval = TimeSpan.FromMilliseconds(120);
+        private readonly TaskCompletionSource<bool> _completionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _target;
         private bool _isCompleting;
+        private bool _isCancelled;
+        private int _idleTicks;
 
         public ProgressSmoother(SoftwarePackage package)
         {
             _package = package;
-            _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+            _target = 5;
+            _timer = new DispatcherTimer { Interval = _tickInterval };
             _timer.Tick += OnTick;
             _timer.Start();
+            if (_package.Progress <= 0)
+            {
+                _package.Progress = 1;
+            }
         }
 
         public void Report(int value)
         {
+            if (_isCancelled)
+            {
+                return;
+            }
+
             var clamped = Math.Max(0, Math.Min(99, value));
             if (clamped > _target)
             {
                 _target = clamped;
             }
+
+            _idleTicks = 0;
         }
 
         public void Complete()
         {
             _target = 100;
             _isCompleting = true;
+            _idleTicks = 0;
         }
 
         public void Cancel()
         {
+            _isCancelled = true;
             Stop();
+        }
+
+        public Task WaitForCompletionAsync()
+        {
+            return _completionSource.Task;
         }
 
         private void OnTick(object? sender, EventArgs e)
         {
-            if (_package.Progress >= _target)
+            if (_isCancelled)
             {
-                if (_isCompleting && _package.Progress < 100)
-                {
-                    _package.Progress = Math.Min(100, _package.Progress + 1);
-                }
+                return;
+            }
 
-                if (_package.Progress >= 100 || !_isCompleting)
+            if (_isCompleting)
+            {
+                if (_package.Progress < 100)
+                {
+                    var completionStep = Math.Max(1, (100 - _package.Progress) / 4);
+                    _package.Progress = Math.Min(100, _package.Progress + completionStep);
+                }
+                else
                 {
                     Stop();
                 }
@@ -520,8 +587,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 return;
             }
 
-            var delta = Math.Max(1, (_target - _package.Progress) / 3);
-            _package.Progress = Math.Min(_target, _package.Progress + delta);
+            if (_package.Progress < _target)
+            {
+                var delta = Math.Max(1, (_target - _package.Progress + 2) / 3);
+                _package.Progress = Math.Min(_target, _package.Progress + delta);
+                _idleTicks = 0;
+                return;
+            }
+
+            _idleTicks++;
+            if (_idleTicks >= 6 && _target < 94)
+            {
+                _target++;
+                _idleTicks = 0;
+            }
         }
 
         private void Stop()
@@ -532,14 +611,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
 
             _timer.Tick -= OnTick;
+            _completionSource.TrySetResult(true);
         }
 
         public void Dispose()
         {
-            if (_isCompleting && _package.Progress < 100)
-            {
-                _package.Progress = 100;
-            }
+            _completionSource.TrySetResult(true);
             Stop();
         }
     }
