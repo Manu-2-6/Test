@@ -165,7 +165,9 @@
                 <TextBlock Text="Journal" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0 0 0 8" />
                 <ListBox x:Name="LogListBox"
                          ItemsSource="{Binding Logs}"
-                         BorderThickness="0" />
+                         BorderThickness="0"
+                         Loaded="LogListBox_OnLoaded"
+                         Unloaded="LogListBox_OnUnloaded" />
             </DockPanel>
         </Border>
     </Grid>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -10,6 +11,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Threading;
 using SoftwareSetupApp.Models;
 using SoftwareSetupApp.Services;
 
@@ -18,12 +21,16 @@ namespace SoftwareSetupApp;
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
     private static readonly Regex AnsiRegex = new("\x1B\\[[0-9;]*[A-Za-z]", RegexOptions.Compiled);
+    private static readonly Regex BlockGlyphRegex = new("[\\u2500-\\u259F\\u25A0-\\u25FF\\u2B00-\\u2BFF]+", RegexOptions.Compiled);
+    private static readonly Regex ExtraWhitespaceRegex = new("\\s{2,}", RegexOptions.Compiled);
 
     private readonly WingetInstaller _installer = new();
     private readonly List<string> _logoDirectories;
     private bool _isInstalling;
     private CancellationTokenSource? _installationCts;
     private string? _lastLogEntry;
+    private ScrollViewer? _logScrollViewer;
+    private bool _shouldAutoScroll = true;
 
     public ObservableCollection<SoftwarePackage> Packages { get; } = new();
     public ObservableCollection<string> Logs { get; } = new();
@@ -68,6 +75,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         _logoDirectories = BuildLogoDirectories();
 
+        ((INotifyCollectionChanged)Logs).CollectionChanged += LogsOnCollectionChanged;
+
         foreach (var directory in _logoDirectories)
         {
             Directory.CreateDirectory(directory);
@@ -108,6 +117,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         PackagesList.IsEnabled = false;
         Logs.Clear();
         _lastLogEntry = null;
+        _shouldAutoScroll = true;
 
         foreach (var package in Packages)
         {
@@ -197,6 +207,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
+    protected override void OnClosed(EventArgs e)
+    {
+        ((INotifyCollectionChanged)Logs).CollectionChanged -= LogsOnCollectionChanged;
+        if (LogListBox != null)
+        {
+            LogListBox_OnUnloaded(LogListBox, new RoutedEventArgs());
+        }
+        base.OnClosed(e);
+    }
+
     private List<string> BuildLogoDirectories()
     {
         var directories = new List<string>();
@@ -251,13 +271,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private async Task<InstallationResult> InstallPackageAsync(SoftwarePackage package, IProgress<string> progress, CancellationToken cancellationToken)
     {
+        ProgressSmoother? smoother = null;
         try
         {
-            var percentProgress = new Progress<int>(value => package.Progress = value);
+            smoother = new ProgressSmoother(package);
+            var percentProgress = new Progress<int>(value => smoother.Report(value));
             var result = await _installer.InstallAsync(package, progress, percentProgress, cancellationToken);
 
             if (result.IsCanceled)
             {
+                smoother.Cancel();
                 package.Status = "Annulé";
                 package.Progress = 0;
                 package.IsProgressVisible = false;
@@ -266,12 +289,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             if (result.IsSuccess)
             {
-                package.Progress = 100;
+                smoother.Complete();
                 package.Status = "Installé";
                 progress.Report($"[{package.Name}] Installation terminée.");
                 return result;
             }
 
+            smoother.Cancel();
             package.Status = "Échec";
             package.IsProgressVisible = false;
 
@@ -284,6 +308,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         catch (OperationCanceledException)
         {
+            smoother?.Cancel();
             package.Status = "Annulé";
             package.Progress = 0;
             package.IsProgressVisible = false;
@@ -292,12 +317,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         catch (Exception ex)
         {
+            smoother?.Cancel();
             package.Status = "Erreur";
             package.Progress = 0;
             package.IsProgressVisible = false;
             var message = $"[{package.Name}] {ex.Message}";
             progress.Report(message);
             return new InstallationResult(false, false, ex.Message);
+        }
+        finally
+        {
+            smoother?.Dispose();
         }
     }
 
@@ -325,7 +355,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             _lastLogEntry = trimmed;
             Logs.Add(trimmed);
-            LogListBox.ScrollIntoView(trimmed);
+            if (_shouldAutoScroll)
+            {
+                if (_logScrollViewer != null)
+                {
+                    _logScrollViewer.ScrollToEnd();
+                }
+                else
+                {
+                    LogListBox.ScrollIntoView(trimmed);
+                }
+            }
         }
     }
 
@@ -337,9 +377,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         var withoutAnsi = AnsiRegex.Replace(message, string.Empty);
-        var builder = new StringBuilder(withoutAnsi.Length);
+        var withoutBlocks = BlockGlyphRegex.Replace(withoutAnsi, string.Empty);
+        var cleaned = withoutBlocks.Replace("\r", string.Empty);
+        var builder = new StringBuilder(cleaned.Length);
 
-        foreach (var ch in withoutAnsi)
+        foreach (var ch in cleaned)
         {
             if (ch == '\n' || !char.IsControl(ch))
             {
@@ -347,7 +389,159 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
         }
 
-        return builder.ToString();
+        var normalized = ExtraWhitespaceRegex.Replace(builder.ToString(), " ");
+        return normalized.Trim();
+    }
+
+    private void LogsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (!_shouldAutoScroll || e.Action != NotifyCollectionChangedAction.Add)
+        {
+            return;
+        }
+
+        if (_logScrollViewer != null)
+        {
+            _logScrollViewer.ScrollToEnd();
+        }
+        else if (LogListBox.Items.Count > 0)
+        {
+            var lastItem = LogListBox.Items[LogListBox.Items.Count - 1];
+            LogListBox.ScrollIntoView(lastItem);
+        }
+    }
+
+    private void LogListBox_OnLoaded(object sender, RoutedEventArgs e)
+    {
+        _logScrollViewer = FindVisualChild<ScrollViewer>(LogListBox);
+        if (_logScrollViewer != null)
+        {
+            _logScrollViewer.ScrollChanged += LogScrollViewerOnScrollChanged;
+        }
+    }
+
+    private void LogListBox_OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (_logScrollViewer != null)
+        {
+            _logScrollViewer.ScrollChanged -= LogScrollViewerOnScrollChanged;
+            _logScrollViewer = null;
+        }
+    }
+
+    private void LogScrollViewerOnScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (_logScrollViewer == null)
+        {
+            return;
+        }
+
+        if (e.ExtentHeightChange == 0)
+        {
+            var atBottom = Math.Abs(_logScrollViewer.VerticalOffset - _logScrollViewer.ScrollableHeight) < 0.5;
+            _shouldAutoScroll = atBottom;
+        }
+        else if (_shouldAutoScroll)
+        {
+            _logScrollViewer.ScrollToEnd();
+        }
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        var childCount = VisualTreeHelper.GetChildrenCount(parent);
+        for (var i = 0; i < childCount; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T typedChild)
+            {
+                return typedChild;
+            }
+
+            var descendant = FindVisualChild<T>(child);
+            if (descendant != null)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
+    }
+
+    private sealed class ProgressSmoother : IDisposable
+    {
+        private readonly SoftwarePackage _package;
+        private readonly DispatcherTimer _timer;
+        private int _target;
+        private bool _isCompleting;
+
+        public ProgressSmoother(SoftwarePackage package)
+        {
+            _package = package;
+            _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+            _timer.Tick += OnTick;
+            _timer.Start();
+        }
+
+        public void Report(int value)
+        {
+            var clamped = Math.Max(0, Math.Min(99, value));
+            if (clamped > _target)
+            {
+                _target = clamped;
+            }
+        }
+
+        public void Complete()
+        {
+            _target = 100;
+            _isCompleting = true;
+        }
+
+        public void Cancel()
+        {
+            Stop();
+        }
+
+        private void OnTick(object? sender, EventArgs e)
+        {
+            if (_package.Progress >= _target)
+            {
+                if (_isCompleting && _package.Progress < 100)
+                {
+                    _package.Progress = Math.Min(100, _package.Progress + 1);
+                }
+
+                if (_package.Progress >= 100 || !_isCompleting)
+                {
+                    Stop();
+                }
+
+                return;
+            }
+
+            var delta = Math.Max(1, (_target - _package.Progress) / 3);
+            _package.Progress = Math.Min(_target, _package.Progress + delta);
+        }
+
+        private void Stop()
+        {
+            if (_timer.IsEnabled)
+            {
+                _timer.Stop();
+            }
+
+            _timer.Tick -= OnTick;
+        }
+
+        public void Dispose()
+        {
+            if (_isCompleting && _package.Progress < 100)
+            {
+                _package.Progress = 100;
+            }
+            Stop();
+        }
     }
 
     private void SelectAllCheckBox_Click(object sender, RoutedEventArgs e)
