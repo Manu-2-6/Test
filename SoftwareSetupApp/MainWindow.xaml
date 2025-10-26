@@ -8,6 +8,61 @@
         mc:Ignorable="d"
         Title="Post-installation Setup" Height="500" Width="680"
         MinWidth="620" MinHeight="420">
+    <Window.Resources>
+        <DataTemplate x:Key="DefaultLogoTemplate">
+            <Border Width="28"
+                    Height="28"
+                    Background="#FFE4E7EB"
+                    CornerRadius="6"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <TextBlock Text="?"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ChromeLogoTemplate">
+            <Grid Width="28" Height="28">
+                <Ellipse Fill="#FFF1F3F4" />
+                <Polygon Fill="#FFDB4437" Points="14,14 26,4 2,4" />
+                <Polygon Fill="#FF0F9D58" Points="14,14 26,24 26,4" />
+                <Polygon Fill="#FFF4B400" Points="14,14 2,24 2,4" />
+                <Ellipse Width="12" Height="12" Fill="#FF4285F4" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Ellipse Width="6" Height="6" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="VlcLogoTemplate">
+            <Grid Width="28" Height="28">
+                <Polygon Fill="#FFF57C00" Points="14,2 24,24 4,24" />
+                <Polygon Fill="#FFFFB74D" Points="14,6 21,22 7,22" />
+                <Grid Margin="0,8,0,4" VerticalAlignment="Stretch">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Rectangle Grid.Row="0" Width="14" Height="3" Fill="White" HorizontalAlignment="Center" Margin="0,0,0,2" />
+                    <Rectangle Grid.Row="1" Width="16" Height="3" Fill="White" HorizontalAlignment="Center" Margin="0,0,0,2" />
+                    <Rectangle Grid.Row="2" Width="18" Height="3" Fill="White" HorizontalAlignment="Center" />
+                </Grid>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="AcrobatLogoTemplate">
+            <Grid Width="28" Height="28">
+                <Border Background="#FFC62828" CornerRadius="6" />
+                <Path Stroke="White"
+                      StrokeThickness="2.2"
+                      StrokeLineJoin="Round"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      Data="M6,18 C10,10 12,10 14,18 C16,14 20,14 22,20 C18,21 14,22 10,21" />
+            </Grid>
+        </DataTemplate>
+    </Window.Resources>
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -50,9 +105,42 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="180" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal">
-                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Content="{Binding Name}" VerticalAlignment="Center" />
-                                </StackPanel>
+                                <CheckBox Grid.Column="0"
+                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          Content="{Binding}"
+                                          VerticalAlignment="Center">
+                                    <CheckBox.ContentTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal"
+                                                        VerticalAlignment="Center">
+                                                <ContentControl Width="32"
+                                                                Height="32"
+                                                                Margin="0,0,12,0"
+                                                                Content="{Binding}"
+                                                                HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center">
+                                                    <ContentControl.Style>
+                                                        <Style TargetType="ContentControl">
+                                                            <Setter Property="ContentTemplate" Value="{StaticResource DefaultLogoTemplate}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding PackageId}" Value="Google.Chrome">
+                                                                    <Setter Property="ContentTemplate" Value="{StaticResource ChromeLogoTemplate}" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding PackageId}" Value="VideoLAN.VLC">
+                                                                    <Setter Property="ContentTemplate" Value="{StaticResource VlcLogoTemplate}" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding PackageId}" Value="Adobe.Acrobat.Reader.64-bit">
+                                                                    <Setter Property="ContentTemplate" Value="{StaticResource AcrobatLogoTemplate}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ContentControl.Style>
+                                                </ContentControl>
+                                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </CheckBox.ContentTemplate>
+                                </CheckBox>
                                 <TextBlock Grid.Column="1" Text="{Binding Status}" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="#2F73DA" />
                             </Grid>
                         </DataTemplate>
