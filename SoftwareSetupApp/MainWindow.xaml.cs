@@ -66,10 +66,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         PackagesList.IsEnabled = false;
         Logs.Clear();
 
-        var progress = new Progress<string>(message =>
+        IProgress<string> progress = new Progress<string>(message =>
         {
-            Logs.Add(message);
-            LogListBox.ScrollIntoView(message);
+            Dispatcher.Invoke(() =>
+            {
+                Logs.Add(message);
+                LogListBox.ScrollIntoView(message);
+            });
         });
 
         foreach (var package in selectedPackages)
