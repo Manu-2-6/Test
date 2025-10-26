@@ -160,14 +160,38 @@
             <Button x:Name="InstallButton" Content="Installer" Width="140" Height="36" Click="InstallButton_Click" />
         </StackPanel>
 
-        <Border Grid.Row="3" Padding="12" CornerRadius="8" Background="#FFFFFF" BorderBrush="#D0D6E2" BorderThickness="1">
+        <Border Grid.Row="3" Padding="12" CornerRadius="8" Background="#000000" BorderBrush="#4A4A4A" BorderThickness="1">
             <DockPanel>
-                <TextBlock Text="Journal" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0 0 0 8" />
+                <TextBlock Text="Journal"
+                           FontWeight="SemiBold"
+                           DockPanel.Dock="Top"
+                           Margin="0 0 0 8"
+                           Foreground="White" />
                 <ListBox x:Name="LogListBox"
                          ItemsSource="{Binding Logs}"
+                         Background="#000000"
+                         Foreground="White"
                          BorderThickness="0"
                          Loaded="LogListBox_OnLoaded"
-                         Unloaded="LogListBox_OnUnloaded" />
+                         Unloaded="LogListBox_OnUnloaded">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding}"
+                                     TextWrapping="Wrap"
+                                     IsReadOnly="True"
+                                     Background="Transparent"
+                                     Foreground="White"
+                                     BorderThickness="0"
+                                     Padding="0"
+                                     Margin="0" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
             </DockPanel>
         </Border>
     </Grid>
