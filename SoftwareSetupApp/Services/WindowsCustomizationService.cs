@@ -13,10 +13,20 @@ namespace SoftwareSetupApp.Services;
 
 public class WindowsCustomizationService
 {
+    private const int HRESULT_S_FALSE = 1;
+
     private static readonly string[] ChromeCandidatePaths =
     {
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Google", "Chrome", "Application", "chrome.exe"),
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Google", "Chrome", "Application", "chrome.exe")
+    };
+
+    private static readonly string[] ChromeAssociations =
+    {
+        ".htm",
+        ".html",
+        "http",
+        "https"
     };
 
     public async Task ApplyAsync(SoftwarePackage package, IProgress<string> progress, CancellationToken cancellationToken)
@@ -152,78 +162,182 @@ public class WindowsCustomizationService
 
         if (options.PinToTaskbar)
         {
-            var scriptBuilder = new StringBuilder();
-            scriptBuilder.AppendLine("$chromePath = [System.IO.Path]::Combine($env:ProgramFiles, 'Google', 'Chrome', 'Application', 'chrome.exe')");
-            scriptBuilder.AppendLine("if (-not (Test-Path $chromePath)) { $chromePath = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, 'Google', 'Chrome', 'Application', 'chrome.exe') }");
-            scriptBuilder.AppendLine("if (Test-Path $chromePath) {");
-            scriptBuilder.AppendLine("    $taskbarFolder = Join-Path $env:AppData 'Microsoft\\Internet Explorer\\Quick Launch\\User Pinned\\TaskBar'");
-            scriptBuilder.AppendLine("    New-Item -ItemType Directory -Force -Path $taskbarFolder | Out-Null");
-            scriptBuilder.AppendLine("    $shortcutPath = Join-Path $taskbarFolder 'Google Chrome.lnk'");
-            scriptBuilder.AppendLine("    $wsh = New-Object -ComObject WScript.Shell");
-            scriptBuilder.AppendLine("    $shortcut = $wsh.CreateShortcut($shortcutPath)");
-            scriptBuilder.AppendLine("    $shortcut.TargetPath = $chromePath");
-            scriptBuilder.AppendLine("    $shortcut.IconLocation = \"$chromePath,0\"");
-            scriptBuilder.AppendLine("    $shortcut.WorkingDirectory = [System.IO.Path]::GetDirectoryName($chromePath)");
-            scriptBuilder.AppendLine("    $shortcut.Save()");
-            scriptBuilder.AppendLine("    $shell = New-Object -ComObject Shell.Application");
-            scriptBuilder.AppendLine("    $appsFolder = $shell.Namespace('shell:Appsfolder')");
-            scriptBuilder.AppendLine("    if ($appsFolder) {");
-            scriptBuilder.AppendLine("        $chromeItems = @()");
-            scriptBuilder.AppendLine("        foreach ($item in $appsFolder.Items()) {");
-            scriptBuilder.AppendLine("            if ($item.Name -match 'Chrome' -or $item.Path -like '*chrome.exe') {");
-            scriptBuilder.AppendLine("                $chromeItems += $item");
-            scriptBuilder.AppendLine("            }");
-            scriptBuilder.AppendLine("        }");
-            scriptBuilder.AppendLine("        foreach ($chromeApp in $chromeItems) {");
-            scriptBuilder.AppendLine("            foreach ($verb in $chromeApp.Verbs()) {");
-            scriptBuilder.AppendLine("                $name = $verb.Name.Replace('&', '')");
-            scriptBuilder.AppendLine("                if ($verb.Verb -eq 'taskbarpin' -or $name -match 'taskbar' -or $name -match 'barre des taches' -or $name -match 'barre des tâches') {");
-            scriptBuilder.AppendLine("                    try { $verb.DoIt() } catch {}");
-            scriptBuilder.AppendLine("                }");
-            scriptBuilder.AppendLine("            }");
-            scriptBuilder.AppendLine("        }");
-            scriptBuilder.AppendLine("    }");
-            scriptBuilder.AppendLine("}");
-            var script = scriptBuilder.ToString();
-            progress.Report("[Google Chrome] Épinglage à la barre des tâches...");
-            await RunPowerShellAsync(script, progress, package.Name, cancellationToken).ConfigureAwait(false);
+            if (chromePath != null)
+            {
+                var script = BuildChromeTaskbarPinningScript(chromePath);
+                progress.Report("[Google Chrome] Épinglage à la barre des tâches...");
+                await RunPowerShellAsync(script, progress, package.Name, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                progress.Report("[Google Chrome] Impossible d'épingler Chrome : exécutable introuvable.");
+            }
         }
 
         cancellationToken.ThrowIfCancellationRequested();
 
         if (options.RequiresPolicyUpdate)
         {
-            var scriptBuilder = new StringBuilder();
-            scriptBuilder.AppendLine("$policyRoot = 'HKCU:\\Software\\Policies\\Google'");
-            scriptBuilder.AppendLine("$chromePolicy = Join-Path $policyRoot 'Chrome'");
-            scriptBuilder.AppendLine("New-Item -Path $policyRoot -Force | Out-Null");
-            scriptBuilder.AppendLine("New-Item -Path $chromePolicy -Force | Out-Null");
-
-            if (options.ConfigureHomepage)
-            {
-                scriptBuilder.AppendLine("New-ItemProperty -Path $chromePolicy -Name 'HomepageLocation' -PropertyType String -Value 'https://www.google.com' -Force | Out-Null");
-                scriptBuilder.AppendLine("New-ItemProperty -Path $chromePolicy -Name 'HomepageIsNewTabPage' -PropertyType DWord -Value 0 -Force | Out-Null");
-                scriptBuilder.AppendLine("New-ItemProperty -Path $chromePolicy -Name 'RestoreOnStartup' -PropertyType DWord -Value 4 -Force | Out-Null");
-                scriptBuilder.AppendLine("New-ItemProperty -Path $chromePolicy -Name 'RestoreOnStartupURLs' -PropertyType MultiString -Value @('https://www.google.com') -Force | Out-Null");
-                scriptBuilder.AppendLine("New-ItemProperty -Path $chromePolicy -Name 'NewTabPageLocation' -PropertyType String -Value 'https://www.google.com' -Force | Out-Null");
-            }
-
-            if (options.ShowBookmarksBar)
-            {
-                scriptBuilder.AppendLine("New-ItemProperty -Path $chromePolicy -Name 'BookmarkBarEnabled' -PropertyType DWord -Value 1 -Force | Out-Null");
-            }
-
-            if (options.AddGoogleBookmark)
-            {
-                const string bookmarksJson = "[{\"t\":\"url\",\"name\":\"Google\",\"url\":\"https://www.google.com\"}]";
-                scriptBuilder.AppendLine($"New-ItemProperty -Path $chromePolicy -Name 'ManagedBookmarks' -PropertyType String -Value \"{bookmarksJson}\" -Force | Out-Null");
-            }
-
-            scriptBuilder.AppendLine("gpupdate.exe /target:user /force | Out-Null");
+            var script = BuildChromePolicyScript(options);
             progress.Report("[Google Chrome] Application des paramètres de page d'accueil et de favoris...");
-            await RunPowerShellAsync(scriptBuilder.ToString(), progress, package.Name, cancellationToken).ConfigureAwait(false);
+            await RunPowerShellAsync(script, progress, package.Name, cancellationToken).ConfigureAwait(false);
         }
     }
+
+    private static string BuildChromeTaskbarPinningScript(string chromePath)
+    {
+        var escapedPath = EscapeForSingleQuotes(chromePath);
+        var userScriptBuilder = new StringBuilder();
+        userScriptBuilder.AppendLine("$ErrorActionPreference = 'SilentlyContinue'");
+        userScriptBuilder.AppendLine($"$chromePath = '{escapedPath}'");
+        userScriptBuilder.AppendLine("if (-not (Test-Path $chromePath)) { return }");
+        userScriptBuilder.AppendLine("$taskbarFolder = Join-Path $env:AppData 'Microsoft\\Internet Explorer\\Quick Launch\\User Pinned\\TaskBar'");
+        userScriptBuilder.AppendLine("New-Item -ItemType Directory -Force -Path $taskbarFolder | Out-Null");
+        userScriptBuilder.AppendLine("$shortcutPath = Join-Path $taskbarFolder 'Google Chrome.lnk'");
+        userScriptBuilder.AppendLine("$wsh = New-Object -ComObject WScript.Shell");
+        userScriptBuilder.AppendLine("$shortcut = $wsh.CreateShortcut($shortcutPath)");
+        userScriptBuilder.AppendLine("$shortcut.TargetPath = $chromePath");
+        userScriptBuilder.AppendLine("$shortcut.IconLocation = \"$chromePath,0\"");
+        userScriptBuilder.AppendLine("$shortcut.WorkingDirectory = [System.IO.Path]::GetDirectoryName($chromePath)");
+        userScriptBuilder.AppendLine("$shortcut.Save()");
+        userScriptBuilder.AppendLine("$shell = New-Object -ComObject Shell.Application");
+        userScriptBuilder.AppendLine("$appsFolder = $shell.Namespace('shell:Appsfolder')");
+        userScriptBuilder.AppendLine("if ($appsFolder) {");
+        userScriptBuilder.AppendLine("    foreach ($item in $appsFolder.Items()) {");
+        userScriptBuilder.AppendLine("        if (-not $item) { continue }");
+        userScriptBuilder.AppendLine("        $itemName = $item.Name");
+        userScriptBuilder.AppendLine("        $itemPath = $item.Path");
+        userScriptBuilder.AppendLine("        if ($itemName -match 'Chrome' -or $itemPath -like '*chrome.exe') {");
+        userScriptBuilder.AppendLine("            foreach ($verb in $item.Verbs()) {");
+        userScriptBuilder.AppendLine("                if (-not $verb) { continue }");
+        userScriptBuilder.AppendLine("                $name = ($verb.Name -replace '&', '').ToLowerInvariant()");
+        userScriptBuilder.AppendLine("                if ($verb.Verb -eq 'taskbarunpin' -or $name -like '*unpin*' -or $name -like '*désepingler*') {");
+        userScriptBuilder.AppendLine("                    try { $verb.DoIt() } catch { }");
+        userScriptBuilder.AppendLine("                }");
+        userScriptBuilder.AppendLine("            }");
+        userScriptBuilder.AppendLine("            foreach ($verb in $item.Verbs()) {");
+        userScriptBuilder.AppendLine("                if (-not $verb) { continue }");
+        userScriptBuilder.AppendLine("                $name = ($verb.Name -replace '&', '').ToLowerInvariant()");
+        userScriptBuilder.AppendLine("                if ($verb.Verb -eq 'taskbarpin' -or $name -like '*taskbar*' -or $name -like '*barre des taches*' -or $name -like '*barre des tâches*') {");
+        userScriptBuilder.AppendLine("                    try { $verb.DoIt() } catch { }");
+        userScriptBuilder.AppendLine("                    break");
+        userScriptBuilder.AppendLine("                }");
+        userScriptBuilder.AppendLine("            }");
+        userScriptBuilder.AppendLine("            break");
+        userScriptBuilder.AppendLine("        }");
+        userScriptBuilder.AppendLine("    }");
+        userScriptBuilder.AppendLine("}");
+
+        var userScript = userScriptBuilder.ToString();
+        var encodedUserScript = Convert.ToBase64String(Encoding.Unicode.GetBytes(userScript));
+
+        var adminScript = new StringBuilder();
+        adminScript.AppendLine("$ErrorActionPreference = 'SilentlyContinue'");
+        adminScript.AppendLine($"$encoded = '{encodedUserScript}'");
+        adminScript.AppendLine("function Invoke-PinScript {");
+        adminScript.AppendLine("    Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand',$encoded) -WindowStyle Hidden | Out-Null");
+        adminScript.AppendLine("}");
+        adminScript.AppendLine("$taskName = 'SoftwareSetupApp_PinChrome'");
+        adminScript.AppendLine("try {");
+        adminScript.AppendLine("    Import-Module ScheduledTasks -ErrorAction Stop | Out-Null");
+        adminScript.AppendLine("    if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) {");
+        adminScript.AppendLine("        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue | Out-Null");
+        adminScript.AppendLine("    }");
+        adminScript.AppendLine("    $principalUser = $null");
+        adminScript.AppendLine("    try {");
+        adminScript.AppendLine("        $explorer = Get-CimInstance Win32_Process -Filter \"Name='explorer.exe'\" -ErrorAction Stop | Sort-Object CreationDate | Select-Object -First 1");
+        adminScript.AppendLine("        if ($explorer) {");
+        adminScript.AppendLine("            $owner = Invoke-CimMethod -InputObject $explorer -MethodName GetOwner -ErrorAction Stop");
+        adminScript.AppendLine("            if ($owner.ReturnValue -eq 0 -and $owner.User) {");
+        adminScript.AppendLine("                $principalUser = \"$($owner.Domain)\\$($owner.User)\";");
+        adminScript.AppendLine("            }");
+        adminScript.AppendLine("        }");
+        adminScript.AppendLine("    } catch { }");
+        adminScript.AppendLine("    if (-not $principalUser) {");
+        adminScript.AppendLine("        $principalUser = \"$env:USERDOMAIN\\$env:USERNAME\";");
+        adminScript.AppendLine("    }");
+        adminScript.AppendLine("    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded\"");
+        adminScript.AppendLine("    $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddSeconds(10))");
+        adminScript.AppendLine("    $principal = New-ScheduledTaskPrincipal -UserId $principalUser -LogonType InteractiveToken");
+        adminScript.AppendLine("    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -RunLevel LeastPrivilege -Force | Out-Null");
+        adminScript.AppendLine("    Start-ScheduledTask -TaskName $taskName | Out-Null");
+        adminScript.AppendLine("} catch {");
+        adminScript.AppendLine("    Invoke-PinScript");
+        adminScript.AppendLine("}");
+
+        return adminScript.ToString();
+    }
+
+    private static string BuildChromePolicyScript(ChromeCustomizationOptions options)
+    {
+        var bookmarksJson = "[{\\\"t\\\":\\\"url\\\",\\\"name\\\":\\\"Google\\\",\\\"url\\\":\\\"https://www.google.com\\\"}]";
+        var scriptBuilder = new StringBuilder();
+        scriptBuilder.AppendLine("$ErrorActionPreference = 'SilentlyContinue'");
+        scriptBuilder.AppendLine($"$configureHomepage = {options.ConfigureHomepage.ToString().ToLowerInvariant()}");
+        scriptBuilder.AppendLine($"$showBookmarksBar = {options.ShowBookmarksBar.ToString().ToLowerInvariant()}");
+        scriptBuilder.AppendLine($"$addBookmark = {options.AddGoogleBookmark.ToString().ToLowerInvariant()}");
+        scriptBuilder.AppendLine($"$bookmarkJson = '{bookmarksJson}'");
+        scriptBuilder.AppendLine("function Set-ChromePolicyProperty {");
+        scriptBuilder.AppendLine("    param([string]$HivePath, [string]$Name, [string]$Type, $Value)");
+        scriptBuilder.AppendLine("    if (-not $HivePath) { return }");
+        scriptBuilder.AppendLine("    try {");
+        scriptBuilder.AppendLine("        $parent = Split-Path $HivePath");
+        scriptBuilder.AppendLine("        if ($parent) { New-Item -Path $parent -Force | Out-Null }");
+        scriptBuilder.AppendLine("        New-Item -Path $HivePath -Force | Out-Null");
+        scriptBuilder.AppendLine("    } catch { }");
+        scriptBuilder.AppendLine("    if ($null -eq $Value) {");
+        scriptBuilder.AppendLine("        Remove-ItemProperty -Path $HivePath -Name $Name -ErrorAction SilentlyContinue");
+        scriptBuilder.AppendLine("        return");
+        scriptBuilder.AppendLine("    }");
+        scriptBuilder.AppendLine("    New-ItemProperty -Path $HivePath -Name $Name -PropertyType $Type -Value $Value -Force | Out-Null");
+        scriptBuilder.AppendLine("}");
+        scriptBuilder.AppendLine("function Apply-ChromePolicies {");
+        scriptBuilder.AppendLine("    param([string]$HivePath)");
+        scriptBuilder.AppendLine("    if (-not $HivePath) { return }");
+        scriptBuilder.AppendLine("    if ($configureHomepage) {");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'HomepageLocation' -Type 'String' -Value 'https://www.google.com'");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'HomepageIsNewTabPage' -Type 'DWord' -Value 0");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'RestoreOnStartup' -Type 'DWord' -Value 4");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'RestoreOnStartupURLs' -Type 'MultiString' -Value @('https://www.google.com')");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'NewTabPageLocation' -Type 'String' -Value 'https://www.google.com'");
+        scriptBuilder.AppendLine("    } else {");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'HomepageLocation' -Type 'String' -Value $null");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'HomepageIsNewTabPage' -Type 'DWord' -Value $null");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'RestoreOnStartup' -Type 'DWord' -Value $null");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'RestoreOnStartupURLs' -Type 'MultiString' -Value $null");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'NewTabPageLocation' -Type 'String' -Value $null");
+        scriptBuilder.AppendLine("    }");
+        scriptBuilder.AppendLine("    if ($showBookmarksBar) {");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'BookmarkBarEnabled' -Type 'DWord' -Value 1");
+        scriptBuilder.AppendLine("    } else {");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'BookmarkBarEnabled' -Type 'DWord' -Value $null");
+        scriptBuilder.AppendLine("    }");
+        scriptBuilder.AppendLine("    if ($addBookmark) {");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'ManagedBookmarks' -Type 'String' -Value $bookmarkJson");
+        scriptBuilder.AppendLine("    } else {");
+        scriptBuilder.AppendLine("        Set-ChromePolicyProperty -HivePath $HivePath -Name 'ManagedBookmarks' -Type 'String' -Value $null");
+        scriptBuilder.AppendLine("    }");
+        scriptBuilder.AppendLine("}");
+        scriptBuilder.AppendLine("$machinePolicy = 'HKLM:\\SOFTWARE\\Policies\\Google\\Chrome'");
+        scriptBuilder.AppendLine("Apply-ChromePolicies -HivePath $machinePolicy");
+        scriptBuilder.AppendLine("$appliedUsers = @()");
+        scriptBuilder.AppendLine("try {");
+        scriptBuilder.AppendLine("    $profiles = Get-CimInstance Win32_UserProfile -ErrorAction Stop | Where-Object { $_.SID -like 'S-1-5-21-*' -and $_.Loaded }");
+        scriptBuilder.AppendLine("    foreach ($profile in $profiles) {");
+        scriptBuilder.AppendLine("        $userHive = \"Registry::HKEY_USERS\\$($profile.SID)\\Software\\Policies\\Google\\Chrome\";");
+        scriptBuilder.AppendLine("        Apply-ChromePolicies -HivePath $userHive");
+        scriptBuilder.AppendLine("        $appliedUsers += $profile.SID");
+        scriptBuilder.AppendLine("    }");
+        scriptBuilder.AppendLine("} catch { }");
+        scriptBuilder.AppendLine("if ($appliedUsers.Count -eq 0) {");
+        scriptBuilder.AppendLine("    Apply-ChromePolicies -HivePath 'HKCU:\\Software\\Policies\\Google\\Chrome'");
+        scriptBuilder.AppendLine("}");
+        scriptBuilder.AppendLine("try { gpupdate.exe /target:user /force | Out-Null } catch { }");
+
+        return scriptBuilder.ToString();
+    }
+
+    private static string EscapeForSingleQuotes(string value) => value.Replace("'", "''");
 
     private static string? FindChromeExecutable()
     {
@@ -260,23 +374,43 @@ public class WindowsCustomizationService
                 return false;
             }
 
+            const string chromeRegisteredName = "ChromeHTML";
             try
             {
-                const string chromeRegisteredName = "Google Chrome";
                 if (registration.QueryAppIsDefaultAll(chromeRegisteredName, ASSOCIATIONLEVEL.AL_EFFECTIVE, out var isDefault) == 0 && isDefault)
                 {
                     progress.Report("[Google Chrome] Navigateur par défaut déjà défini.");
                     return true;
                 }
 
+                // Windows 11 peut refuser SetAppAsDefaultAll. On force alors chaque association prise en charge.
                 var hr = registration.SetAppAsDefaultAll(chromeRegisteredName);
-                if (hr == 0)
+                if (hr == HRESULT_S_FALSE)
                 {
-                    progress.Report("[Google Chrome] Navigateur par défaut défini via l'API Windows.");
+                    hr = 0;
+                }
+
+                if (hr != 0)
+                {
+                    foreach (var association in ChromeAssociations)
+                    {
+                        var associationType = association.StartsWith('.', StringComparison.Ordinal)
+                            ? ASSOCIATIONTYPE.AT_FILEEXTENSION
+                            : ASSOCIATIONTYPE.AT_URLPROTOCOL;
+                        var setHr = registration.SetAppAsDefault(chromeRegisteredName, association, associationType);
+
+                        if (setHr != 0)
+                        {
+                            Marshal.ThrowExceptionForHR(setHr);
+                        }
+                    }
+
+                    progress.Report("[Google Chrome] Associations individuelles configurées via l'API Windows.");
                     return true;
                 }
 
-                Marshal.ThrowExceptionForHR(hr);
+                progress.Report("[Google Chrome] Navigateur par défaut défini via l'API Windows.");
+                return true;
             }
             finally
             {
