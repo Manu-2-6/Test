@@ -57,7 +57,7 @@
         </Border>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 16 0 16">
-            <Button x:Name="InstallButton" Content="Installer" Width="140" Height="36" Click="InstallButton_Click" />
+            <Button x:Name="InstallButton" Content="Installer" Width="140" Height="36" Click="InstallButton_Click" Margin="0 0 12 0" />
         </StackPanel>
 
         <Border Grid.Row="3" Padding="12" CornerRadius="8" Background="#FFFFFF" BorderBrush="#D0D6E2" BorderThickness="1">
