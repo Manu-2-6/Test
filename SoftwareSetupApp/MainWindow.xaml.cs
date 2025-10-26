@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using SoftwareSetupApp.Models;
 using SoftwareSetupApp.Services;
 
@@ -111,25 +112,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
-    private void SelectAllCheckBox_Checked(object sender, RoutedEventArgs e)
+    private void SelectAllCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        var shouldSelectAll = Packages.Any(p => !p.IsSelected);
+        SetAllPackagesSelection(shouldSelectAll);
+    }
+
+    private void SetAllPackagesSelection(bool isSelected)
     {
         foreach (var package in Packages)
         {
-            package.IsSelected = true;
+            package.IsSelected = isSelected;
         }
-    }
-
-    private void SelectAllCheckBox_Unchecked(object sender, RoutedEventArgs e)
-    {
-        foreach (var package in Packages)
-        {
-            package.IsSelected = false;
-        }
-    }
-
-    private void SelectAllCheckBox_Indeterminate(object sender, RoutedEventArgs e)
-    {
-        // No direct action required when indeterminate, state is controlled by individual selections.
     }
 
     private void PackageOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
