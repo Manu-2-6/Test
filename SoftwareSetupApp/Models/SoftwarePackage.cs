@@ -10,6 +10,7 @@ public class SoftwarePackage : INotifyPropertyChanged
     private string _status = "Prêt";
     private string? _logoPath;
     private int _progress;
+    private bool _isProgressVisible;
 
     public SoftwarePackage(string name, string packageId)
     {
@@ -72,6 +73,19 @@ public class SoftwarePackage : INotifyPropertyChanged
             if (_progress != clamped)
             {
                 _progress = clamped;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public bool IsProgressVisible
+    {
+        get => _isProgressVisible;
+        set
+        {
+            if (_isProgressVisible != value)
+            {
+                _isProgressVisible = value;
                 OnPropertyChanged();
             }
         }

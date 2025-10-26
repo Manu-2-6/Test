@@ -33,6 +33,8 @@ public class WingetInstaller
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
             var outputBuilder = new StringBuilder();
             var errorBuilder = new StringBuilder();
@@ -41,19 +43,19 @@ public class WingetInstaller
             var errorCompletion = new TaskCompletionSource<object?>();
 
             percentProgress?.Report(0);
+            var lastReportedPercent = 0;
 
             process.OutputDataReceived += (_, args) =>
             {
                 if (args.Data == null)
                 {
                     outputCompletion.TrySetResult(null);
+                    return;
                 }
-                else
-                {
-                    outputBuilder.AppendLine(args.Data);
-                    progress.Report($"[{package.Name}] {args.Data}");
-                    TryReportPercentage(args.Data, percentProgress);
-                }
+
+                outputBuilder.AppendLine(args.Data);
+                progress.Report($"[{package.Name}] {args.Data}");
+                TryReportPercentage(args.Data, percentProgress, ref lastReportedPercent);
             };
 
             process.ErrorDataReceived += (_, args) =>
@@ -61,25 +63,46 @@ public class WingetInstaller
                 if (args.Data == null)
                 {
                     errorCompletion.TrySetResult(null);
+                    return;
                 }
-                else
-                {
-                    errorBuilder.AppendLine(args.Data);
-                    progress.Report($"[{package.Name}] {args.Data}");
-                    TryReportPercentage(args.Data, percentProgress);
-                }
+
+                errorBuilder.AppendLine(args.Data);
+                progress.Report($"[{package.Name}] {args.Data}");
+                TryReportPercentage(args.Data, percentProgress, ref lastReportedPercent);
             };
 
             if (!process.Start())
             {
-                return new InstallationResult(false, $"[{package.Name}] Impossible de démarrer winget.");
+                return new InstallationResult(false, false, $"[{package.Name}] Impossible de démarrer winget.");
             }
+
+            using var registration = cancellationToken.Register(() =>
+            {
+                try
+                {
+                    if (!process.HasExited)
+                    {
+                        process.Kill(true);
+                    }
+                }
+                catch
+                {
+                    // Ignored
+                }
+            });
 
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            await Task.WhenAll(outputCompletion.Task, errorCompletion.Task).ConfigureAwait(false);
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+                await Task.WhenAll(outputCompletion.Task, errorCompletion.Task).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return new InstallationResult(false, true, $"[{package.Name}] Installation annulée.");
+            }
 
             var output = outputBuilder.ToString().Trim();
             var error = errorBuilder.ToString().Trim();
@@ -92,17 +115,15 @@ public class WingetInstaller
                 percentProgress?.Report(100);
             }
 
-            return isSuccess
-                ? new InstallationResult(true, message)
-                : new InstallationResult(false, message);
+            return new InstallationResult(isSuccess, false, isSuccess ? string.Empty : message);
         }
         catch (Win32Exception)
         {
-            return new InstallationResult(false, "winget est introuvable sur ce poste.");
+            return new InstallationResult(false, false, "winget est introuvable sur ce poste.");
         }
     }
 
-    private static void TryReportPercentage(string data, IProgress<int>? percentProgress)
+    private static void TryReportPercentage(string data, IProgress<int>? percentProgress, ref int lastReportedPercent)
     {
         if (percentProgress == null || string.IsNullOrWhiteSpace(data))
         {
@@ -110,16 +131,23 @@ public class WingetInstaller
         }
 
         var match = PercentageRegex.Match(data);
-        if (match.Success && int.TryParse(match.Groups[1].Value, out var value))
+        if (!match.Success || !int.TryParse(match.Groups[1].Value, out var value))
         {
-            var clamped = Math.Max(0, Math.Min(100, value));
-            percentProgress.Report(clamped);
+            return;
         }
-        else if (data.Contains("terminé", StringComparison.OrdinalIgnoreCase) ||
-                 data.Contains("installed", StringComparison.OrdinalIgnoreCase) ||
-                 data.Contains("success", StringComparison.OrdinalIgnoreCase))
+
+        var clamped = Math.Max(0, Math.Min(100, value));
+        if (clamped >= 100)
         {
-            percentProgress.Report(100);
+            clamped = 99;
         }
+
+        if (clamped <= lastReportedPercent)
+        {
+            return;
+        }
+
+        lastReportedPercent = clamped;
+        percentProgress.Report(clamped);
     }
 }

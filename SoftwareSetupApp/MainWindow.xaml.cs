@@ -6,6 +6,8 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using SoftwareSetupApp.Models;
@@ -15,9 +17,13 @@ namespace SoftwareSetupApp;
 
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
+    private static readonly Regex AnsiRegex = new("\x1B\[[0-9;]*[A-Za-z]", RegexOptions.Compiled);
+
     private readonly WingetInstaller _installer = new();
     private readonly List<string> _logoDirectories;
     private bool _isInstalling;
+    private CancellationTokenSource? _installationCts;
+    private string? _lastLogEntry;
 
     public ObservableCollection<SoftwarePackage> Packages { get; } = new();
     public ObservableCollection<string> Logs { get; } = new();
@@ -32,6 +38,26 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 _isInstalling = value;
                 OnPropertyChanged(nameof(IsInstalling));
             }
+        }
+    }
+
+    private void CancelButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!IsInstalling || _installationCts == null)
+        {
+            return;
+        }
+
+        var confirmation = MessageBox.Show(
+            "Voulez-vous annuler l'installation en cours ?",
+            "Confirmation",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (confirmation == MessageBoxResult.Yes)
+        {
+            CancelButton.IsEnabled = false;
+            _installationCts.Cancel();
         }
     }
 
@@ -73,36 +99,102 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
+        var selectedSet = selectedPackages.ToHashSet();
+
         IsInstalling = true;
         InstallButton.IsEnabled = false;
+        CancelButton.IsEnabled = true;
         SelectAllCheckBox.IsEnabled = false;
         PackagesList.IsEnabled = false;
         Logs.Clear();
+        _lastLogEntry = null;
+
+        foreach (var package in Packages)
+        {
+            package.IsProgressVisible = false;
+            if (!selectedSet.Contains(package))
+            {
+                continue;
+            }
+
+            package.Status = "En attente...";
+            package.Progress = 0;
+        }
+
+        _installationCts = new CancellationTokenSource();
+        var cancellationToken = _installationCts.Token;
+        var wasCancelled = false;
 
         IProgress<string> progress = new Progress<string>(message =>
         {
-            Dispatcher.Invoke(() =>
-            {
-                Logs.Add(message);
-                LogListBox.ScrollIntoView(message);
-            });
+            Dispatcher.Invoke(() => AppendLogMessage(message));
         });
 
-        foreach (var package in selectedPackages)
+        try
         {
-            package.Status = "Installation en cours...";
-            package.Progress = 0;
-            progress.Report($"[{package.Name}] Démarrage de l'installation.");
-            await InstallPackageAsync(package, progress);
+            for (var i = 0; i < selectedPackages.Count; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var package = selectedPackages[i];
+                package.Status = "Installation en cours...";
+                package.IsProgressVisible = true;
+                package.Progress = 0;
+
+                progress.Report($"[{package.Name}] Démarrage de l'installation.");
+
+                var result = await InstallPackageAsync(package, progress, cancellationToken);
+                if (result.IsCanceled || cancellationToken.IsCancellationRequested)
+                {
+                    wasCancelled = true;
+                    CancelButton.IsEnabled = false;
+                }
+
+                if (wasCancelled)
+                {
+                    for (var j = i + 1; j < selectedPackages.Count; j++)
+                    {
+                        var pending = selectedPackages[j];
+                        pending.Status = "Annulé";
+                        pending.Progress = 0;
+                        pending.IsProgressVisible = false;
+                    }
+
+                    break;
+                }
+            }
+
+            progress.Report(wasCancelled ? "Installation annulée." : "Installation terminée.");
         }
+        catch (OperationCanceledException)
+        {
+            wasCancelled = true;
 
-        progress.Report("Installation terminée.");
+            foreach (var package in selectedPackages)
+            {
+                if (string.Equals(package.Status, "Installation en cours...", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(package.Status, "En attente...", StringComparison.OrdinalIgnoreCase))
+                {
+                    package.Status = "Annulé";
+                    package.Progress = 0;
+                    package.IsProgressVisible = false;
+                }
+            }
 
-        IsInstalling = false;
-        InstallButton.IsEnabled = true;
-        SelectAllCheckBox.IsEnabled = true;
-        PackagesList.IsEnabled = true;
-        UpdateSelectAllState();
+            progress.Report("Installation annulée.");
+        }
+        finally
+        {
+            _installationCts?.Dispose();
+            _installationCts = null;
+
+            IsInstalling = false;
+            InstallButton.IsEnabled = true;
+            CancelButton.IsEnabled = false;
+            SelectAllCheckBox.IsEnabled = true;
+            PackagesList.IsEnabled = true;
+            UpdateSelectAllState();
+        }
     }
 
     private List<string> BuildLogoDirectories()
@@ -157,33 +249,105 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         return null;
     }
 
-    private async Task InstallPackageAsync(SoftwarePackage package, IProgress<string> progress)
+    private async Task<InstallationResult> InstallPackageAsync(SoftwarePackage package, IProgress<string> progress, CancellationToken cancellationToken)
     {
         try
         {
             var percentProgress = new Progress<int>(value => package.Progress = value);
-            var result = await _installer.InstallAsync(package, progress, percentProgress, CancellationToken.None);
-            package.Status = result.IsSuccess
-                ? "Installé"
-                : "Échec";
+            var result = await _installer.InstallAsync(package, progress, percentProgress, cancellationToken);
+
+            if (result.IsCanceled)
+            {
+                package.Status = "Annulé";
+                package.Progress = 0;
+                package.IsProgressVisible = false;
+                return result;
+            }
 
             if (result.IsSuccess)
             {
                 package.Progress = 100;
+                package.Status = "Installé";
                 progress.Report($"[{package.Name}] Installation terminée.");
+                return result;
             }
+
+            package.Status = "Échec";
+            package.IsProgressVisible = false;
 
             if (!string.IsNullOrWhiteSpace(result.Message))
             {
-                progress.Report(result.Message);
+                progress.Report($"[{package.Name}] {result.Message}");
             }
+
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            package.Status = "Annulé";
+            package.Progress = 0;
+            package.IsProgressVisible = false;
+            progress.Report($"[{package.Name}] Installation annulée.");
+            return new InstallationResult(false, true, string.Empty);
         }
         catch (Exception ex)
         {
             package.Status = "Erreur";
             package.Progress = 0;
-            progress.Report($"[{package.Name}] {ex.Message}");
+            package.IsProgressVisible = false;
+            var message = $"[{package.Name}] {ex.Message}";
+            progress.Report(message);
+            return new InstallationResult(false, false, ex.Message);
         }
+    }
+
+    private void AppendLogMessage(string message)
+    {
+        var sanitized = SanitizeLogMessage(message);
+        if (string.IsNullOrWhiteSpace(sanitized))
+        {
+            return;
+        }
+
+        var lines = sanitized.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed))
+            {
+                continue;
+            }
+
+            if (string.Equals(trimmed, _lastLogEntry, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            _lastLogEntry = trimmed;
+            Logs.Add(trimmed);
+            LogListBox.ScrollIntoView(trimmed);
+        }
+    }
+
+    private static string SanitizeLogMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message))
+        {
+            return string.Empty;
+        }
+
+        var withoutAnsi = AnsiRegex.Replace(message, string.Empty);
+        var builder = new StringBuilder(withoutAnsi.Length);
+
+        foreach (var ch in withoutAnsi)
+        {
+            if (ch == '\n' || !char.IsControl(ch))
+            {
+                builder.Append(ch);
+            }
+        }
+
+        return builder.ToString();
     }
 
     private void SelectAllCheckBox_Click(object sender, RoutedEventArgs e)
