@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,7 @@ namespace SoftwareSetupApp;
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
     private readonly WingetInstaller _installer = new();
+    private readonly string _logosDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Logos");
     private bool _isInstalling;
 
     public ObservableCollection<SoftwarePackage> Packages { get; } = new();
@@ -37,14 +39,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         InitializeComponent();
         DataContext = this;
 
-        Packages.Add(new SoftwarePackage("VLC", "VideoLAN.VLC", "vlc"));
-        Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome", "chrome"));
-        Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit", "acrobat"));
+        Directory.CreateDirectory(_logosDirectory);
+
+        Packages.Add(new SoftwarePackage("VLC", "VideoLAN.VLC"));
+        Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome"));
+        Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
 
         foreach (var package in Packages)
         {
             package.PropertyChanged += PackageOnPropertyChanged;
         }
+
+        LoadPackageLogos();
     }
 
     private async void InstallButton_Click(object sender, RoutedEventArgs e)
@@ -89,6 +95,39 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SelectAllCheckBox.IsEnabled = true;
         PackagesList.IsEnabled = true;
         UpdateSelectAllState();
+    }
+
+    private void LoadPackageLogos()
+    {
+        foreach (var package in Packages)
+        {
+            package.LogoPath = FindLogoForPackage(package.Name);
+        }
+    }
+
+    private string? FindLogoForPackage(string packageName)
+    {
+        if (!Directory.Exists(_logosDirectory))
+        {
+            return null;
+        }
+
+        var normalized = packageName?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return null;
+        }
+
+        foreach (var filePath in Directory.EnumerateFiles(_logosDirectory))
+        {
+            var fileName = Path.GetFileNameWithoutExtension(filePath);
+            if (fileName != null && string.Equals(fileName, normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                return filePath;
+            }
+        }
+
+        return null;
     }
 
     private async Task InstallPackageAsync(SoftwarePackage package, IProgress<string> progress)

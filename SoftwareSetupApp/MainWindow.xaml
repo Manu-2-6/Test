@@ -4,10 +4,15 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SoftwareSetupApp"
+        xmlns:converters="clr-namespace:SoftwareSetupApp.Converters"
         xmlns:models="clr-namespace:SoftwareSetupApp.Models"
         mc:Ignorable="d"
         Title="Post-installation Setup" Height="500" Width="680"
         MinWidth="620" MinHeight="420">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <converters:NameInitialConverter x:Key="NameInitialConverter" />
+    </Window.Resources>
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -54,112 +59,47 @@
                                               IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                               VerticalAlignment="Center"
                                               Margin="0 0 12 0" />
-                                    <ContentControl Grid.Column="1"
-                                                    Margin="0 0 12 0"
-                                                    VerticalAlignment="Center"
-                                                    Content="{Binding}">
-                                        <ContentControl.Style>
-                                            <Style TargetType="ContentControl">
-                                                <Setter Property="ContentTemplate">
-                                                    <Setter.Value>
-                                                        <DataTemplate>
-                                                            <Border Width="32"
-                                                                    Height="32"
-                                                                    CornerRadius="8"
-                                                                    Background="#E0E3EB"
-                                                                    HorizontalAlignment="Center"
-                                                                    VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding Name}"
-                                                                           TextTrimming="CharacterEllipsis"
-                                                                           FontWeight="SemiBold"
-                                                                           HorizontalAlignment="Center"
-                                                                           VerticalAlignment="Center"
-                                                                           Foreground="#425066" />
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding LogoKey}" Value="vlc">
-                                                        <Setter Property="ContentTemplate">
-                                                            <Setter.Value>
-                                                                <DataTemplate>
-                                                                    <Border Width="32"
-                                                                            Height="32"
-                                                                            CornerRadius="8"
-                                                                            Background="#FFF3E0"
-                                                                            Padding="4">
-                                                                        <Grid>
-                                                                            <Polygon Points="16,2 27,26 5,26"
-                                                                                     Fill="#FF9800" />
-                                                                            <Polygon Points="16,6 24,24 8,24"
-                                                                                     Fill="#FFE0B2" />
-                                                                            <Rectangle Width="18"
-                                                                                       Height="4"
-                                                                                       RadiusX="2"
-                                                                                       RadiusY="2"
-                                                                                       Fill="White"
-                                                                                       VerticalAlignment="Bottom"
-                                                                                       Margin="0 0 0 2"
-                                                                                       HorizontalAlignment="Center" />
-                                                                        </Grid>
-                                                                    </Border>
-                                                                </DataTemplate>
-                                                            </Setter.Value>
-                                                        </Setter>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding LogoKey}" Value="chrome">
-                                                        <Setter Property="ContentTemplate">
-                                                            <Setter.Value>
-                                                                <DataTemplate>
-                                                                    <Grid Width="32"
-                                                                          Height="32">
-                                                                        <Ellipse Fill="#F44336" />
-                                                                        <Path Data="M16,2 L28,28 L16,16 Z"
-                                                                              Fill="#FFEB3B" />
-                                                                        <Path Data="M16,2 L4,16 L16,16 Z"
-                                                                              Fill="#4CAF50" />
-                                                                        <Path Data="M4,16 L16,30 L16,16 Z"
-                                                                              Fill="#1A73E8" />
-                                                                        <Ellipse Width="18"
-                                                                                 Height="18"
-                                                                                 Fill="White"
-                                                                                 HorizontalAlignment="Center"
-                                                                                 VerticalAlignment="Center" />
-                                                                        <Ellipse Width="10"
-                                                                                 Height="10"
-                                                                                 Fill="#1A73E8"
-                                                                                 HorizontalAlignment="Center"
-                                                                                 VerticalAlignment="Center" />
-                                                                    </Grid>
-                                                                </DataTemplate>
-                                                            </Setter.Value>
-                                                        </Setter>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding LogoKey}" Value="acrobat">
-                                                        <Setter Property="ContentTemplate">
-                                                            <Setter.Value>
-                                                                <DataTemplate>
-                                                                    <Border Width="32"
-                                                                            Height="32"
-                                                                            CornerRadius="8"
-                                                                            Background="#D3002D"
-                                                                            Padding="3">
-                                                                        <Grid>
-                                                                            <Path Data="M15,4 L21,26 H18 L16,19 H10 L8,26 H5 L11,8 Z"
-                                                                                  Fill="White"
-                                                                                  Stretch="Fill"
-                                                                                  Margin="3 2 3 2" />
-                                                                        </Grid>
-                                                                    </Border>
-                                                                </DataTemplate>
-                                                            </Setter.Value>
-                                                        </Setter>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </ContentControl.Style>
-                                    </ContentControl>
+                                    <Grid Grid.Column="1"
+                                          Width="32"
+                                          Height="32"
+                                          Margin="0 0 12 0"
+                                          VerticalAlignment="Center">
+                                        <Image Width="32"
+                                               Height="32"
+                                               Stretch="Uniform"
+                                               Source="{Binding LogoPath}">
+                                            <Image.Style>
+                                                <Style TargetType="Image">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasLogo}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Image.Style>
+                                        </Image>
+                                        <Border CornerRadius="8"
+                                                Background="#E0E3EB"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasLogo}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding Name, Converter={StaticResource NameInitialConverter}}"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="#425066" />
+                                        </Border>
+                                    </Grid>
                                     <TextBlock Grid.Column="2"
                                                Text="{Binding Name}"
                                                VerticalAlignment="Center"
