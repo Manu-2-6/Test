@@ -17,7 +17,7 @@
 
         <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0 0 0 16">
             <TextBlock Text="Préparez votre poste en installant les applications essentielles." FontSize="18" FontWeight="SemiBold" />
-            <TextBlock Text="Sélectionnez les logiciels à installer via winget puis cliquez sur \"Installer\"." Margin="0 6 0 0" />
+            <TextBlock Text="Sélectionnez les logiciels à installer via winget puis cliquez sur &quot;Installer&quot;." Margin="0 6 0 0" />
         </StackPanel>
 
         <Border Grid.Row="1" Padding="12" CornerRadius="8" Background="#F4F6FB" BorderBrush="#D0D6E2" BorderThickness="1">
