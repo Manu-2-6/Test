@@ -56,7 +56,7 @@
             </StackPanel>
         </Border>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 16 0 16" Spacing="12">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 16 0 16">
             <Button x:Name="InstallButton" Content="Installer" Width="140" Height="36" Click="InstallButton_Click" />
         </StackPanel>
 
