@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SoftwareSetupApp"
+        xmlns:models="clr-namespace:SoftwareSetupApp.Models"
         mc:Ignorable="d"
         Title="Post-installation Setup" Height="500" Width="680"
         MinWidth="620" MinHeight="420">
@@ -39,7 +40,7 @@
                         </Style>
                     </ListView.Resources>
                     <ListView.ItemTemplate>
-                        <DataTemplate DataType="{x:Type local:SoftwarePackage}">
+                        <DataTemplate DataType="{x:Type models:SoftwarePackage}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
