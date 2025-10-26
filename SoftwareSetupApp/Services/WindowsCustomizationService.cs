@@ -153,11 +153,15 @@ $appsFolder = (New-Object -ComObject Shell.Application).Namespace('shell:Appsfol
 if ($appsFolder) {
     $chromeApp = $appsFolder.ParseName('Google Chrome')
     if ($chromeApp) {
-        foreach ($verb in $chromeApp.Verbs()) {
-            $name = $verb.Name.Replace('&', '')
-            if ($name -match 'taskbar' -or $name -match 'barre des taches' -or $name -match 'barre des tâches') {
-                $verb.DoIt()
-                break
+        try {
+            $chromeApp.InvokeVerb('taskbarpin')
+        } catch {
+            foreach ($verb in $chromeApp.Verbs()) {
+                $name = $verb.Name.Replace('&', '')
+                if ($verb.Verb -eq 'taskbarpin' -or $name -match 'taskbar' -or $name -match 'barre des taches' -or $name -match 'barre des tâches') {
+                    $verb.DoIt()
+                    break
+                }
             }
         }
     }
@@ -179,22 +183,22 @@ if ($appsFolder) {
 
             if (options.ConfigureHomepage)
             {
-                scriptBuilder.AppendLine("Set-ItemProperty -Path $chromePolicy -Name 'HomepageLocation' -Value 'https://www.google.com'");
-                scriptBuilder.AppendLine("Set-ItemProperty -Path $chromePolicy -Name 'HomepageIsNewTabPage' -Type DWord -Value 0");
-                scriptBuilder.AppendLine("Set-ItemProperty -Path $chromePolicy -Name 'RestoreOnStartup' -Type DWord -Value 4");
-                scriptBuilder.AppendLine("Set-ItemProperty -Path $chromePolicy -Name 'RestoreOnStartupURLs' -Type MultiString -Value @('https://www.google.com')");
-                scriptBuilder.AppendLine("Set-ItemProperty -Path $chromePolicy -Name 'NewTabPageLocation' -Value 'https://www.google.com'");
+                scriptBuilder.AppendLine("New-ItemProperty -Path $chromePolicy -Name 'HomepageLocation' -PropertyType String -Value 'https://www.google.com' -Force | Out-Null");
+                scriptBuilder.AppendLine("New-ItemProperty -Path $chromePolicy -Name 'HomepageIsNewTabPage' -PropertyType DWord -Value 0 -Force | Out-Null");
+                scriptBuilder.AppendLine("New-ItemProperty -Path $chromePolicy -Name 'RestoreOnStartup' -PropertyType DWord -Value 4 -Force | Out-Null");
+                scriptBuilder.AppendLine("New-ItemProperty -Path $chromePolicy -Name 'RestoreOnStartupURLs' -PropertyType MultiString -Value @('https://www.google.com') -Force | Out-Null");
+                scriptBuilder.AppendLine("New-ItemProperty -Path $chromePolicy -Name 'NewTabPageLocation' -PropertyType String -Value 'https://www.google.com' -Force | Out-Null");
             }
 
             if (options.ShowBookmarksBar)
             {
-                scriptBuilder.AppendLine("Set-ItemProperty -Path $chromePolicy -Name 'BookmarkBarEnabled' -Type DWord -Value 1");
+                scriptBuilder.AppendLine("New-ItemProperty -Path $chromePolicy -Name 'BookmarkBarEnabled' -PropertyType DWord -Value 1 -Force | Out-Null");
             }
 
             if (options.AddGoogleBookmark)
             {
                 const string bookmarksJson = "[{\"t\":\"url\",\"name\":\"Google\",\"url\":\"https://www.google.com\"}]";
-                scriptBuilder.AppendLine($"Set-ItemProperty -Path $chromePolicy -Name 'ManagedBookmarks' -Value '{bookmarksJson}'");
+                scriptBuilder.AppendLine($"New-ItemProperty -Path $chromePolicy -Name 'ManagedBookmarks' -PropertyType String -Value \"{bookmarksJson}\" -Force | Out-Null");
             }
 
             progress.Report("[Google Chrome] Application des paramètres de page d'accueil et de favoris...");
