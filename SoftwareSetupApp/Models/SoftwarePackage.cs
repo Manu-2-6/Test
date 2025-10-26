@@ -11,6 +11,8 @@ public class SoftwarePackage : INotifyPropertyChanged
     private string? _logoPath;
     private int _progress;
     private bool _isProgressVisible;
+    private bool _shouldSetAsDefault;
+    private bool _isOptionsExpanded = true;
 
     public SoftwarePackage(string name, string packageId)
     {
@@ -50,6 +52,34 @@ public class SoftwarePackage : INotifyPropertyChanged
             }
         }
     }
+
+    public bool ShouldSetAsDefault
+    {
+        get => _shouldSetAsDefault;
+        set
+        {
+            if (_shouldSetAsDefault != value)
+            {
+                _shouldSetAsDefault = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public bool IsOptionsExpanded
+    {
+        get => _isOptionsExpanded;
+        set
+        {
+            if (_isOptionsExpanded != value)
+            {
+                _isOptionsExpanded = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public bool IsChrome => string.Equals(Name, "Google Chrome", StringComparison.OrdinalIgnoreCase);
 
     public string Status
     {

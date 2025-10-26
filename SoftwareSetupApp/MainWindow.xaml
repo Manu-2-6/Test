@@ -53,95 +53,127 @@
                     <ListView.ItemTemplate>
                         <DataTemplate DataType="{x:Type models:SoftwarePackage}">
                             <Grid Margin="0 4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="220" />
-                                </Grid.ColumnDefinitions>
-                                <Grid Margin="0" VerticalAlignment="Center">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="220" />
                                     </Grid.ColumnDefinitions>
-                                    <CheckBox Grid.Column="0"
-                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                              VerticalAlignment="Center"
-                                              Margin="0 0 12 0" />
-                                    <Grid Grid.Column="1"
-                                          Width="32"
-                                          Height="32"
-                                          Margin="0 0 12 0"
-                                          VerticalAlignment="Center">
-                                        <Image Width="32"
-                                               Height="32"
-                                               Stretch="Uniform"
-                                               Source="{Binding LogoPath}">
-                                            <Image.Style>
-                                                <Style TargetType="Image">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasLogo}" Value="True">
-                                                            <Setter Property="Visibility" Value="Visible" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Image.Style>
-                                        </Image>
-                                        <Border CornerRadius="8"
-                                                Background="#E0E3EB"
-                                                HorizontalAlignment="Center"
-                                                VerticalAlignment="Center">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasLogo}" Value="True">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
-                                            <TextBlock Text="{Binding Name, Converter={StaticResource NameInitialConverter}}"
-                                                       FontWeight="SemiBold"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       Foreground="#425066" />
-                                        </Border>
-                                    </Grid>
-                                    <TextBlock Grid.Column="2"
-                                               Text="{Binding Name}"
-                                               VerticalAlignment="Center"
-                                               FontWeight="SemiBold"
-                                               Foreground="#1F2933" />
-                                </Grid>
-                                <Grid Grid.Column="1"
-                                      Margin="12 0 0 0"
-                                      VerticalAlignment="Center">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <Grid Grid.Row="0"
-                                          Height="20"
-                                          VerticalAlignment="Center"
-                                          Visibility="{Binding IsProgressVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <ProgressBar Minimum="0"
-                                                     Maximum="100"
-                                                     Value="{Binding Progress}"
-                                                     Height="20"
-                                                     VerticalAlignment="Center" />
-                                        <TextBlock Text="{Binding Progress, StringFormat={}{0}%}"
-                                                   HorizontalAlignment="Center"
+                                    <Grid Margin="0" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox Grid.Column="0"
+                                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0 0 12 0" />
+                                        <Grid Grid.Column="1"
+                                              Width="32"
+                                              Height="32"
+                                              Margin="0 0 12 0"
+                                              VerticalAlignment="Center">
+                                            <Image Width="32"
+                                                   Height="32"
+                                                   Stretch="Uniform"
+                                                   Source="{Binding LogoPath}">
+                                                <Image.Style>
+                                                    <Style TargetType="Image">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasLogo}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Image.Style>
+                                            </Image>
+                                            <Border CornerRadius="8"
+                                                    Background="#E0E3EB"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasLogo}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="{Binding Name, Converter={StaticResource NameInitialConverter}}"
+                                                           FontWeight="SemiBold"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="#425066" />
+                                            </Border>
+                                        </Grid>
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding Name}"
                                                    VerticalAlignment="Center"
                                                    FontWeight="SemiBold"
                                                    Foreground="#1F2933" />
                                     </Grid>
-                                    <TextBlock Grid.Row="1"
-                                               Text="{Binding Status}"
-                                               HorizontalAlignment="Right"
-                                               Margin="0 4 0 0"
-                                               Foreground="#2F73DA" />
+                                    <Grid Grid.Column="1"
+                                          Margin="12 0 0 0"
+                                          VerticalAlignment="Center">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Grid Grid.Row="0"
+                                              Height="20"
+                                              VerticalAlignment="Center"
+                                              Visibility="{Binding IsProgressVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <ProgressBar Minimum="0"
+                                                         Maximum="100"
+                                                         Value="{Binding Progress}"
+                                                         Height="20"
+                                                         VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding Progress, StringFormat={}{0}%}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#1F2933" />
+                                        </Grid>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding Status}"
+                                                   HorizontalAlignment="Right"
+                                                   Margin="0 4 0 0"
+                                                   Foreground="#2F73DA" />
+                                    </Grid>
                                 </Grid>
+                                <Expander Grid.Row="1"
+                                          Margin="44 6 0 0"
+                                          Header="Options"
+                                          IsExpanded="{Binding IsOptionsExpanded, Mode=TwoWay}">
+                                    <StackPanel Margin="0 4 0 0">
+                                        <CheckBox Content="Définir comme application par défaut"
+                                                  IsChecked="{Binding ShouldSetAsDefault, Mode=TwoWay}" />
+                                        <StackPanel Margin="20 4 0 0"
+                                                    Visibility="{Binding IsChrome, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <TextBlock Text="Les personnalisations suivantes seront appliquées pour Google Chrome :"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0 0 0 4" />
+                                            <TextBlock Text="• Page d'accueil définie sur https://www.google.com"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0 0 0 2" />
+                                            <TextBlock Text="• Barre des favoris affichée"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0 0 0 2" />
+                                            <TextBlock Text="• Favori ‘Google’ ajouté à la barre des favoris"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0 0 0 2" />
+                                            <TextBlock Text="• Application épinglée à la barre des tâches"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Expander>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>

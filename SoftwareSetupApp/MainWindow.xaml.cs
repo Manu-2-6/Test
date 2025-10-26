@@ -295,9 +295,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (result.IsSuccess)
             {
                 smoother.Complete();
-                await smoother.WaitForCompletionAsync();
+                await smoother.WaitForCompletionAsync().ConfigureAwait(false);
                 package.Status = "Installé";
                 progress.Report($"[{package.Name}] Installation terminée.");
+                await ApplyPostInstallActionsAsync(package, progress, cancellationToken).ConfigureAwait(false);
                 return result;
             }
 
@@ -690,6 +691,30 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (e.PropertyName == nameof(SoftwarePackage.IsSelected))
         {
             UpdateSelectAllState();
+        }
+    }
+
+    private async Task ApplyPostInstallActionsAsync(SoftwarePackage package, IProgress<string> progress, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (package.ShouldSetAsDefault)
+            {
+                await DefaultAppService.RequestDefaultApplicationAsync(package, progress, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (package.IsChrome)
+            {
+                await ChromeCustomizationService.ApplyAsync(progress, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            progress.Report($"[{package.Name}] Actions post-installation annulées.");
+        }
+        catch (Exception ex)
+        {
+            progress.Report($"[{package.Name}] Erreur lors des actions post-installation : {ex.Message}");
         }
     }
 
