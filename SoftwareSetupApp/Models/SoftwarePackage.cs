@@ -7,6 +7,7 @@ public class SoftwarePackage : INotifyPropertyChanged
 {
     private bool _isSelected;
     private string _status = "Prêt";
+    private string? _logoPath;
 
     public SoftwarePackage(string name, string packageId)
     {
@@ -17,6 +18,22 @@ public class SoftwarePackage : INotifyPropertyChanged
     public string Name { get; }
 
     public string PackageId { get; }
+
+    public string? LogoPath
+    {
+        get => _logoPath;
+        set
+        {
+            if (_logoPath != value)
+            {
+                _logoPath = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasLogo));
+            }
+        }
+    }
+
+    public bool HasLogo => !string.IsNullOrWhiteSpace(_logoPath);
 
     public bool IsSelected
     {

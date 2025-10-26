@@ -4,10 +4,15 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SoftwareSetupApp"
+        xmlns:converters="clr-namespace:SoftwareSetupApp.Converters"
         xmlns:models="clr-namespace:SoftwareSetupApp.Models"
         mc:Ignorable="d"
         Title="Post-installation Setup" Height="500" Width="680"
         MinWidth="620" MinHeight="420">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <converters:NameInitialConverter x:Key="NameInitialConverter" />
+    </Window.Resources>
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -39,15 +44,73 @@
                     </ListView.Resources>
                     <ListView.ItemTemplate>
                         <DataTemplate DataType="{x:Type models:SoftwarePackage}">
-                            <Grid>
+                            <Grid Margin="0 4">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="180" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal">
-                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Content="{Binding Name}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <TextBlock Grid.Column="1" Text="{Binding Status}" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="#2F73DA" />
+                                <Grid Margin="0" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox Grid.Column="0"
+                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                              VerticalAlignment="Center"
+                                              Margin="0 0 12 0" />
+                                    <Grid Grid.Column="1"
+                                          Width="32"
+                                          Height="32"
+                                          Margin="0 0 12 0"
+                                          VerticalAlignment="Center">
+                                        <Image Width="32"
+                                               Height="32"
+                                               Stretch="Uniform"
+                                               Source="{Binding LogoPath}">
+                                            <Image.Style>
+                                                <Style TargetType="Image">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasLogo}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Image.Style>
+                                        </Image>
+                                        <Border CornerRadius="8"
+                                                Background="#E0E3EB"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasLogo}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding Name, Converter={StaticResource NameInitialConverter}}"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="#425066" />
+                                        </Border>
+                                    </Grid>
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding Name}"
+                                               VerticalAlignment="Center"
+                                               FontWeight="SemiBold"
+                                               Foreground="#1F2933" />
+                                </Grid>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Status}"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           Foreground="#2F73DA" />
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>
