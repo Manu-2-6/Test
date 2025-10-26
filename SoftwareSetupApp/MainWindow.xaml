@@ -35,7 +35,9 @@
                           Click="SelectAllCheckBox_Click" />
                 <ListView x:Name="PackagesList"
                           ItemsSource="{Binding Packages}"
-                          BorderThickness="0">
+                          BorderThickness="0"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListView.Resources>
                         <Style TargetType="ListViewItem">
                             <Setter Property="Padding" Value="4" />
