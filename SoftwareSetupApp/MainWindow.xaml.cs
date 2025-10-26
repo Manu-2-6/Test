@@ -392,7 +392,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return string.Empty;
         }
 
-        var normalizedMessage = message.Normalize(NormalizationForm.FormKC);
+        var safeMessage = RemoveInvalidSurrogates(message);
+        if (string.IsNullOrEmpty(safeMessage))
+        {
+            return string.Empty;
+        }
+
+        string normalizedMessage;
+        try
+        {
+            normalizedMessage = safeMessage.Normalize(NormalizationForm.FormKC);
+        }
+        catch (ArgumentException)
+        {
+            normalizedMessage = safeMessage;
+        }
+
         var withoutAnsi = AnsiRegex.Replace(normalizedMessage, string.Empty);
         var withoutBlocks = BlockGlyphRegex.Replace(withoutAnsi, string.Empty);
         var withoutBrokenGlyphs = BrokenUtf8GlyphRegex.Replace(withoutBlocks, string.Empty);
@@ -410,6 +425,41 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var withoutProgressBars = SimpleProgressBarRegex.Replace(builder.ToString(), string.Empty);
         var normalized = ExtraWhitespaceRegex.Replace(withoutProgressBars, " ");
         return normalized.Trim();
+    }
+
+    private static string RemoveInvalidSurrogates(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder(input.Length);
+        for (var i = 0; i < input.Length; i++)
+        {
+            var current = input[i];
+
+            if (char.IsHighSurrogate(current))
+            {
+                if (i + 1 < input.Length && char.IsLowSurrogate(input[i + 1]))
+                {
+                    builder.Append(current);
+                    builder.Append(input[i + 1]);
+                    i++;
+                }
+
+                continue;
+            }
+
+            if (char.IsLowSurrogate(current))
+            {
+                continue;
+            }
+
+            builder.Append(current);
+        }
+
+        return builder.ToString();
     }
 
     private static bool IsUsefulLogLine(string line)
