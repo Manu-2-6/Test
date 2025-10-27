@@ -60,8 +60,8 @@ try {
         const string script = @"
 Write-Output 'Désactivation de la suspension sélective USB sur secteur et batterie.';
 try {
-    & powercfg /setacvalueindex SCHEME_CURRENT SUB_USB USBSELECTIVE 0 | Out-Null;
-    & powercfg /setdcvalueindex SCHEME_CURRENT SUB_USB USBSELECTIVE 0 | Out-Null;
+    & powercfg /setacvalueindex SCHEME_CURRENT SUB_USB USBSELECTIVESETTING 0 | Out-Null;
+    & powercfg /setdcvalueindex SCHEME_CURRENT SUB_USB USBSELECTIVESETTING 0 | Out-Null;
     & powercfg /setactive SCHEME_CURRENT | Out-Null;
     Write-Output 'Suspension sélective USB désactivée.';
 } catch {
@@ -372,8 +372,9 @@ try {
         CancellationToken cancellationToken)
     {
         context.Report($"{ChecklistPrefix} : {description}");
-        var arguments = BuildEncodedPowerShellArguments(script);
-        return ExecuteProcessAsync("powershell", arguments, context, cancellationToken);
+        var preparedScript = PrepareScript(script);
+        var arguments = BuildEncodedPowerShellArguments(preparedScript);
+        return ExecuteProcessAsync("powershell.exe", arguments, context, cancellationToken);
     }
 
     private static string BuildEncodedPowerShellArguments(string script)
@@ -381,7 +382,21 @@ try {
         var normalized = script?.Replace("\r\n", "\n") ?? string.Empty;
         var bytes = Encoding.Unicode.GetBytes(normalized);
         var encoded = Convert.ToBase64String(bytes);
-        return $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}";
+        return $"-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encoded}";
+    }
+
+    private static string PrepareScript(string script)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("$ProgressPreference = 'SilentlyContinue';");
+        builder.AppendLine("$InformationPreference = 'Continue';");
+
+        if (!string.IsNullOrWhiteSpace(script))
+        {
+            builder.AppendLine(script.Trim());
+        }
+
+        return builder.ToString();
     }
 
     private async Task<AutomationResult> ExecuteProcessAsync(
@@ -398,8 +413,8 @@ try {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
+            StandardOutputEncoding = Encoding.Unicode,
+            StandardErrorEncoding = Encoding.Unicode
         };
 
         try
@@ -419,7 +434,7 @@ try {
                     return;
                 }
 
-                context.Report($"{ChecklistPrefix} ▶ {args.Data}");
+                ReportProcessLine(context, '▶', args.Data);
             };
 
             process.ErrorDataReceived += (_, args) =>
@@ -430,7 +445,7 @@ try {
                     return;
                 }
 
-                context.Report($"{ChecklistPrefix} ⚠ {args.Data}");
+                ReportProcessLine(context, '⚠', args.Data);
             };
 
             if (!process.Start())
@@ -478,5 +493,49 @@ try {
         {
             return AutomationResult.FromException(ex);
         }
+    }
+
+    private static void ReportProcessLine(SetupAutomationContext context, char symbol, string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return;
+        }
+
+        var trimmed = line.Trim();
+
+        if (ShouldSuppressLine(trimmed))
+        {
+            return;
+        }
+
+        context.Report($"{ChecklistPrefix} {symbol} {trimmed}");
+    }
+
+    private static bool ShouldSuppressLine(string line)
+    {
+        if (string.IsNullOrEmpty(line))
+        {
+            return true;
+        }
+
+        if (line.StartsWith("#< CLIXML", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (line.StartsWith("<Objs", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("<Obj", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("<TN", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("<MS", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("</Objs", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("</Obj", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("</TN", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("</MS", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 }
