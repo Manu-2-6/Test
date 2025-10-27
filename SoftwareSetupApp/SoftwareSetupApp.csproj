@@ -13,14 +13,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ApplicationDefinition Update="App.xaml">
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Remove="MainWindow.xaml" />
+    <Page Remove="PostInstallReminderWindow.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml">
       <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Page Update="MainWindow.xaml">
+    <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Update="PostInstallReminderWindow.xaml">
+    <Page Include="PostInstallReminderWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
