@@ -29,6 +29,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         new("[\\p{L}\\p{Nd}]+(?:[\\p{L}\\p{Nd}\\p{P}]*[\\p{L}\\p{Nd}]+)?", RegexOptions.Compiled);
 
     private readonly WingetInstaller _installer = new();
+    private readonly WindowsConfigurationExecutor _configurationExecutor = new();
     private readonly List<string> _logoDirectories;
     private bool _isInstalling;
     private CancellationTokenSource? _installationCts;
@@ -37,6 +38,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _shouldAutoScroll = true;
 
     public ObservableCollection<SoftwarePackage> Packages { get; } = new();
+    public ObservableCollection<ConfigurationTask> ConfigurationTasks { get; } = new();
     public ObservableCollection<string> Logs { get; } = new();
 
     public bool IsInstalling
@@ -96,7 +98,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             package.PropertyChanged += PackageOnPropertyChanged;
         }
 
+        ConfigurationTasks.Add(
+            new ConfigurationTask(
+                "Désactiver la suspension USB dans les options d’alimentation",
+                new[]
+                {
+                    "powercfg -setacvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0",
+                    "powercfg -setdcvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0",
+                    "powercfg -S SCHEME_CURRENT"
+                })
+            {
+                Description = "Désactive la suspension sélective USB sur secteur et batterie."
+            });
+
+        foreach (var task in ConfigurationTasks)
+        {
+            task.PropertyChanged += TaskOnPropertyChanged;
+        }
+
         LoadPackageLogos();
+        UpdateProgramsSelectAllState();
+        UpdateTasksSelectAllState();
     }
 
     private async void InstallButton_Click(object sender, RoutedEventArgs e)
@@ -107,19 +129,28 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         var selectedPackages = Packages.Where(p => p.IsSelected).ToList();
-        if (!selectedPackages.Any())
+        var selectedTasks = ConfigurationTasks.Where(t => t.IsSelected).ToList();
+
+        if (!selectedPackages.Any() && !selectedTasks.Any())
         {
-            MessageBox.Show("Sélectionnez au moins un logiciel à installer.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                "Sélectionnez au moins un logiciel ou une tâche à exécuter.",
+                "Information",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
-        var selectedSet = selectedPackages.ToHashSet();
+        var selectedPackageSet = selectedPackages.ToHashSet();
+        var selectedTaskSet = selectedTasks.ToHashSet();
 
         IsInstalling = true;
         InstallButton.IsEnabled = false;
         CancelButton.IsEnabled = true;
-        SelectAllCheckBox.IsEnabled = false;
+        ProgramsSelectAllCheckBox.IsEnabled = false;
+        TasksSelectAllCheckBox.IsEnabled = false;
         PackagesList.IsEnabled = false;
+        TasksList.IsEnabled = false;
         Logs.Clear();
         _lastLogEntry = null;
         _shouldAutoScroll = true;
@@ -127,13 +158,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var package in Packages)
         {
             package.IsProgressVisible = false;
-            if (!selectedSet.Contains(package))
+            if (!selectedPackageSet.Contains(package))
             {
                 continue;
             }
 
             package.Status = "En attente...";
             package.Progress = 0;
+        }
+
+        foreach (var task in ConfigurationTasks)
+        {
+            task.Status = selectedTaskSet.Contains(task) ? "En attente..." : "Prêt";
         }
 
         _installationCts = new CancellationTokenSource();
@@ -179,6 +215,59 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 }
             }
 
+            if (!wasCancelled && selectedTasks.Count > 0)
+            {
+                progress.Report("Début des tâches de paramétrage Windows.");
+            }
+
+            if (!wasCancelled)
+            {
+                for (var i = 0; i < selectedTasks.Count; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var task = selectedTasks[i];
+                    task.Status = "Exécution en cours...";
+                    progress.Report($"[Tâche] {task.Name} - démarrage.");
+
+                    var result = await _configurationExecutor.ExecuteAsync(task, progress, cancellationToken);
+                    if (result.IsCanceled || cancellationToken.IsCancellationRequested)
+                    {
+                        wasCancelled = true;
+                        CancelButton.IsEnabled = false;
+                    }
+
+                    if (result.IsSuccess)
+                    {
+                        task.Status = "Terminé";
+                        progress.Report($"[Tâche] {task.Name} terminée.");
+                    }
+                    else if (result.IsCanceled)
+                    {
+                        task.Status = "Annulé";
+                    }
+                    else
+                    {
+                        task.Status = "Échec";
+                        if (!string.IsNullOrWhiteSpace(result.Message))
+                        {
+                            progress.Report($"[Tâche] {result.Message}");
+                        }
+                    }
+
+                    if (wasCancelled)
+                    {
+                        for (var j = i + 1; j < selectedTasks.Count; j++)
+                        {
+                            var pendingTask = selectedTasks[j];
+                            pendingTask.Status = "Annulé";
+                        }
+
+                        break;
+                    }
+                }
+            }
+
             progress.Report(wasCancelled ? "Installation annulée." : "Installation terminée.");
         }
         catch (OperationCanceledException)
@@ -196,6 +285,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 }
             }
 
+            foreach (var task in selectedTasks)
+            {
+                if (string.Equals(task.Status, "Exécution en cours...", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(task.Status, "En attente...", StringComparison.OrdinalIgnoreCase))
+                {
+                    task.Status = "Annulé";
+                }
+            }
+
             progress.Report("Installation annulée.");
         }
         finally
@@ -206,9 +304,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             IsInstalling = false;
             InstallButton.IsEnabled = true;
             CancelButton.IsEnabled = false;
-            SelectAllCheckBox.IsEnabled = true;
+            ProgramsSelectAllCheckBox.IsEnabled = true;
+            TasksSelectAllCheckBox.IsEnabled = true;
             PackagesList.IsEnabled = true;
-            UpdateSelectAllState();
+            TasksList.IsEnabled = true;
+            UpdateProgramsSelectAllState();
+            UpdateTasksSelectAllState();
         }
     }
 
@@ -671,10 +772,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
-    private void SelectAllCheckBox_Click(object sender, RoutedEventArgs e)
+    private void ProgramsSelectAllCheckBox_Click(object sender, RoutedEventArgs e)
     {
         var shouldSelectAll = Packages.Any(p => !p.IsSelected);
         SetAllPackagesSelection(shouldSelectAll);
+    }
+
+    private void TasksSelectAllCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        var shouldSelectAll = ConfigurationTasks.Any(t => !t.IsSelected);
+        SetAllTasksSelection(shouldSelectAll);
     }
 
     private void SetAllPackagesSelection(bool isSelected)
@@ -685,28 +792,71 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
+    private void SetAllTasksSelection(bool isSelected)
+    {
+        foreach (var task in ConfigurationTasks)
+        {
+            task.IsSelected = isSelected;
+        }
+    }
+
     private void PackageOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(SoftwarePackage.IsSelected))
         {
-            UpdateSelectAllState();
+            UpdateProgramsSelectAllState();
         }
     }
 
-    private void UpdateSelectAllState()
+    private void TaskOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(ConfigurationTask.IsSelected))
+        {
+            UpdateTasksSelectAllState();
+        }
+    }
+
+    private void UpdateProgramsSelectAllState()
+    {
+        if (ProgramsSelectAllCheckBox == null)
+        {
+            return;
+        }
+
         var selectedCount = Packages.Count(p => p.IsSelected);
         if (selectedCount == 0)
         {
-            SelectAllCheckBox.IsChecked = false;
+            ProgramsSelectAllCheckBox.IsChecked = false;
         }
         else if (selectedCount == Packages.Count)
         {
-            SelectAllCheckBox.IsChecked = true;
+            ProgramsSelectAllCheckBox.IsChecked = true;
         }
         else
         {
-            SelectAllCheckBox.IsChecked = null;
+            ProgramsSelectAllCheckBox.IsChecked = null;
+        }
+    }
+
+    private void UpdateTasksSelectAllState()
+    {
+        if (TasksSelectAllCheckBox == null)
+        {
+            return;
+        }
+
+        var selectedCount = ConfigurationTasks.Count(t => t.IsSelected);
+        if (selectedCount == 0)
+        {
+            TasksSelectAllCheckBox.IsChecked = false;
+        }
+        else if (selectedCount == ConfigurationTasks.Count)
+        {
+            TasksSelectAllCheckBox.IsChecked = true;
+        }
+        else
+        {
+            TasksSelectAllCheckBox.IsChecked = null;
         }
     }
 
