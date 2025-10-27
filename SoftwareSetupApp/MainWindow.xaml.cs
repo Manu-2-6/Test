@@ -11,6 +11,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
 using SoftwareSetupApp.Models;
@@ -38,6 +39,44 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     public ObservableCollection<SoftwarePackage> Packages { get; } = new();
     public ObservableCollection<string> Logs { get; } = new();
+    public ObservableCollection<SetupTask> Tasks { get; } = new();
+
+    public ICollectionView TasksView { get; }
+
+    public IReadOnlyList<SelectionOption<DeviceType>> DeviceTypeOptions { get; }
+
+    public IReadOnlyList<SelectionOption<UserProfile>> UserProfileOptions { get; }
+
+    private DeviceType _selectedDeviceType = DeviceType.Desktop;
+    private UserProfile _selectedUserProfile = UserProfile.Standard;
+
+    public DeviceType SelectedDeviceType
+    {
+        get => _selectedDeviceType;
+        set
+        {
+            if (_selectedDeviceType != value)
+            {
+                _selectedDeviceType = value;
+                OnPropertyChanged(nameof(SelectedDeviceType));
+                TasksView.Refresh();
+            }
+        }
+    }
+
+    public UserProfile SelectedUserProfile
+    {
+        get => _selectedUserProfile;
+        set
+        {
+            if (_selectedUserProfile != value)
+            {
+                _selectedUserProfile = value;
+                OnPropertyChanged(nameof(SelectedUserProfile));
+                TasksView.Refresh();
+            }
+        }
+    }
 
     public bool IsInstalling
     {
@@ -75,6 +114,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public MainWindow()
     {
         InitializeComponent();
+        DeviceTypeOptions = new List<SelectionOption<DeviceType>>
+        {
+            new(DeviceType.Desktop, "Ordinateur fixe"),
+            new(DeviceType.Laptop, "Ordinateur portable")
+        };
+
+        UserProfileOptions = new List<SelectionOption<UserProfile>>
+        {
+            new(UserProfile.Standard, "Utilisateur standard"),
+            new(UserProfile.Medic, "Médecin")
+        };
+
+        TasksView = CollectionViewSource.GetDefaultView(Tasks);
+        TasksView.Filter = TaskFilter;
+
         DataContext = this;
 
         _logoDirectories = BuildLogoDirectories();
@@ -97,6 +151,165 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         LoadPackageLogos();
+        InitializeTasks();
+    }
+
+    private bool TaskFilter(object? item)
+    {
+        if (item is not SetupTask task)
+        {
+            return false;
+        }
+
+        return task.AppliesTo(SelectedDeviceType, SelectedUserProfile);
+    }
+
+    private void InitializeTasks()
+    {
+        Tasks.Clear();
+
+        Tasks.Add(new SetupTask(
+            "PC fixe : configurer la veille et la luminosité",
+            """
+            Pour un ordinateur fixe sur secteur :
+            • Veille écran : 30 minutes
+            • Veille PC : 1 heure (professionnels : aucun)
+            • Luminosité : 100 %
+            """,
+            DeviceTypeScope.Desktop,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "PC portable : configurer la veille sur secteur",
+            """
+            Pour un ordinateur portable branché sur secteur :
+            • Veille écran : 30 minutes
+            • Veille PC : 1 heure (professionnels : aucun)
+            • Luminosité : 100 %
+            """,
+            DeviceTypeScope.Laptop,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "Modifier les paramètres d’alimentation avancés",
+            """
+            - Arrêt des disques : 0 minute
+            - Paramètres de la carte graphique : performances maximales
+            - Gestion de l’alimentation du processeur : état minimal 100 %
+            """,
+            DeviceTypeScope.All,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "Médecins : désactiver la suspension USB dans les options d’alimentation",
+            """
+            1. Démarrer → Panneau de configuration → Matériel et audio → Options d’alimentation
+            2. Modifier les paramètres du mode actif
+            3. Ouvrir les paramètres d’alimentation avancés
+            4. Paramètres USB → Paramètre de suspension sélective USB → Désactivé (secteur et batterie)
+            5. Appliquer puis valider
+            """,
+            DeviceTypeScope.All,
+            UserProfileScope.Medic));
+
+        Tasks.Add(new SetupTask(
+            "Médecins : empêcher la mise en veille USB dans le gestionnaire de périphériques",
+            """
+            1. Win + X → Gestionnaire de périphériques
+            2. Déployer « Contrôleurs de bus USB »
+            3. Pour chaque concentrateur USB racine → Propriétés → Onglet Gestion de l’alimentation
+            4. Décocher « Autoriser l’ordinateur à éteindre ce périphérique pour économiser l’énergie »
+            """,
+            DeviceTypeScope.All,
+            UserProfileScope.Medic));
+
+        Tasks.Add(new SetupTask(
+            "Médecins : désactiver la mise en veille des cartes réseau",
+            """
+            1. Gestionnaire de périphériques → Cartes réseau
+            2. Ouvrir la carte utilisée (Ethernet ou Wi-Fi)
+            3. Onglet Gestion de l’alimentation → Décocher l’extinction automatique
+            """,
+            DeviceTypeScope.All,
+            UserProfileScope.Medic));
+
+        Tasks.Add(new SetupTask(
+            "Gestionnaire de périphériques : contrôler les pilotes",
+            "Win + X → Gestionnaire de périphériques → rechercher les pilotes manquants (icônes avec avertissement)",
+            DeviceTypeScope.All,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "Windows Update : appliquer toutes les mises à jour",
+            """
+            - Lancer la recherche des mises à jour
+            - Installer également les mises à jour facultatives
+            - Redémarrer puis relancer la recherche jusqu’à absence de mises à jour
+            - Si besoin, compléter via le site constructeur ou les assistants OEM
+            """,
+            DeviceTypeScope.All,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "Microsoft Store : tout mettre à jour",
+            "Ouvrir l’onglet Téléchargements, cliquer sur « Obtenir les mises à jour » ou « Tout mettre à jour »",
+            DeviceTypeScope.All,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "Désinstaller les applications publicitaires",
+            "Supprimer les applications préinstallées type Xbox, LinkedIn ou promotions équivalentes",
+            DeviceTypeScope.All,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "Afficher les icônes système sur le bureau",
+            "Bureau → Clic droit → Personnaliser → Thèmes → Paramètres des icônes du bureau → activer Ordinateur, Fichiers de l’utilisateur et Corbeille",
+            DeviceTypeScope.All,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "Réorganiser l’explorateur",
+            "Dans l’explorateur, placer « Ce PC » sous « Fichiers de l’utilisateur » portant le nom de l’utilisateur",
+            DeviceTypeScope.All,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "Installer les navigateurs et utilitaires essentiels",
+            "Installer Google Chrome et/ou Firefox, Adobe Acrobat Reader, VLC et les accords client requis",
+            DeviceTypeScope.All,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "Nettoyage disque après mises à jour",
+            """
+            1. Win + R → cleanmgr
+            2. Cliquer sur « Nettoyer les fichiers système »
+            3. Tout cocher sauf la Corbeille puis valider
+            4. Redémarrer la machine
+            """,
+            DeviceTypeScope.All,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "Nettoyer les historiques et téléchargements",
+            "Effacer l’historique des navigateurs et supprimer les fichiers temporaires ou téléchargements inutiles",
+            DeviceTypeScope.All,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "Vérifications système (chkdsk & SFC)",
+            "Win + X → Terminal/PowerShell (admin) → exécuter successivement ‘chkdsk c: /F’ (confirmer) puis ‘sfc /scannow’, redémarrer ensuite",
+            DeviceTypeScope.All,
+            UserProfileScope.All));
+
+        Tasks.Add(new SetupTask(
+            "Optimiser les lecteurs",
+            "Ouvrir dfrgui ou Ce PC → clic droit sur C: → Propriétés → Outils → Optimiser chaque partition disponible",
+            DeviceTypeScope.All,
+            UserProfileScope.All));
+
+        TasksView.Refresh();
     }
 
     private async void InstallButton_Click(object sender, RoutedEventArgs e)
