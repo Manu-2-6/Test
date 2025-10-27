@@ -1,6 +1,8 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace SoftwareSetupApp.Models;
 
@@ -40,12 +42,14 @@ public class SetupTask : INotifyPropertyChanged
         string title,
         string details,
         DeviceTypeScope deviceScope,
-        UserProfileScope profileScope)
+        UserProfileScope profileScope,
+        Func<SetupAutomationContext, CancellationToken, Task<AutomationResult>>? automationAction = null)
     {
         Title = title;
         Details = details;
         DeviceScope = deviceScope;
         ProfileScope = profileScope;
+        AutomationAction = automationAction;
     }
 
     public string Title { get; }
@@ -55,6 +59,10 @@ public class SetupTask : INotifyPropertyChanged
     public DeviceTypeScope DeviceScope { get; }
 
     public UserProfileScope ProfileScope { get; }
+
+    public Func<SetupAutomationContext, CancellationToken, Task<AutomationResult>>? AutomationAction { get; }
+
+    public bool HasAutomation => AutomationAction != null;
 
     public bool IsCompleted
     {
@@ -74,6 +82,16 @@ public class SetupTask : INotifyPropertyChanged
         var deviceFlag = deviceType == DeviceType.Desktop ? DeviceTypeScope.Desktop : DeviceTypeScope.Laptop;
         var profileFlag = profile == UserProfile.Medic ? UserProfileScope.Medic : UserProfileScope.Standard;
         return DeviceScope.HasFlag(deviceFlag) && ProfileScope.HasFlag(profileFlag);
+    }
+
+    public Task<AutomationResult> ExecuteAsync(SetupAutomationContext context, CancellationToken cancellationToken)
+    {
+        if (AutomationAction == null)
+        {
+            return Task.FromResult(AutomationResult.Success());
+        }
+
+        return AutomationAction(context, cancellationToken);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -28,8 +28,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private static readonly Regex BrokenUtf8GlyphRegex = new("â[\\u0080-\\u00FF]", RegexOptions.Compiled);
     private static readonly Regex UsefulContentRegex =
         new("[\\p{L}\\p{Nd}]+(?:[\\p{L}\\p{Nd}\\p{P}]*[\\p{L}\\p{Nd}]+)?", RegexOptions.Compiled);
+    private static readonly HashSet<string> EssentialPackageNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "VLC",
+        "Google Chrome",
+        "Adobe Acrobat Reader",
+        "LibreOffice"
+    };
 
     private readonly WingetInstaller _installer = new();
+    private readonly SetupAutomationService _automationService = new();
     private readonly List<string> _logoDirectories;
     private bool _isInstalling;
     private CancellationTokenSource? _installationCts;
@@ -177,7 +185,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             • Luminosité : 100 %
             """,
             DeviceTypeScope.Desktop,
-            UserProfileScope.All));
+            UserProfileScope.All,
+            _automationService.ConfigureDesktopPowerAsync));
 
         Tasks.Add(new SetupTask(
             "PC portable : configurer la veille sur secteur",
@@ -188,7 +197,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             • Luminosité : 100 %
             """,
             DeviceTypeScope.Laptop,
-            UserProfileScope.All));
+            UserProfileScope.All,
+            _automationService.ConfigureLaptopPowerAsync));
 
         Tasks.Add(new SetupTask(
             "Modifier les paramètres d’alimentation avancés",
@@ -198,7 +208,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             - Gestion de l’alimentation du processeur : état minimal 100 %
             """,
             DeviceTypeScope.All,
-            UserProfileScope.All));
+            UserProfileScope.All,
+            _automationService.ConfigureAdvancedPowerAsync));
 
         Tasks.Add(new SetupTask(
             "Médecins : désactiver la suspension USB dans les options d’alimentation",
@@ -210,7 +221,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             5. Appliquer puis valider
             """,
             DeviceTypeScope.All,
-            UserProfileScope.Medic));
+            UserProfileScope.Medic,
+            _automationService.DisableUsbSelectiveSuspendAsync));
 
         Tasks.Add(new SetupTask(
             "Médecins : empêcher la mise en veille USB dans le gestionnaire de périphériques",
@@ -221,7 +233,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             4. Décocher « Autoriser l’ordinateur à éteindre ce périphérique pour économiser l’énergie »
             """,
             DeviceTypeScope.All,
-            UserProfileScope.Medic));
+            UserProfileScope.Medic,
+            _automationService.DisableUsbPowerManagementAsync));
 
         Tasks.Add(new SetupTask(
             "Médecins : désactiver la mise en veille des cartes réseau",
@@ -231,13 +244,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             3. Onglet Gestion de l’alimentation → Décocher l’extinction automatique
             """,
             DeviceTypeScope.All,
-            UserProfileScope.Medic));
+            UserProfileScope.Medic,
+            _automationService.DisableNetworkPowerManagementAsync));
 
         Tasks.Add(new SetupTask(
             "Gestionnaire de périphériques : contrôler les pilotes",
             "Win + X → Gestionnaire de périphériques → rechercher les pilotes manquants (icônes avec avertissement)",
             DeviceTypeScope.All,
-            UserProfileScope.All));
+            UserProfileScope.All,
+            _automationService.CheckDeviceManagerAsync));
 
         Tasks.Add(new SetupTask(
             "Windows Update : appliquer toutes les mises à jour",
@@ -248,25 +263,29 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             - Si besoin, compléter via le site constructeur ou les assistants OEM
             """,
             DeviceTypeScope.All,
-            UserProfileScope.All));
+            UserProfileScope.All,
+            _automationService.RunWindowsUpdateAsync));
 
         Tasks.Add(new SetupTask(
             "Microsoft Store : tout mettre à jour",
             "Ouvrir l’onglet Téléchargements, cliquer sur « Obtenir les mises à jour » ou « Tout mettre à jour »",
             DeviceTypeScope.All,
-            UserProfileScope.All));
+            UserProfileScope.All,
+            _automationService.RunMicrosoftStoreUpdatesAsync));
 
         Tasks.Add(new SetupTask(
             "Désinstaller les applications publicitaires",
             "Supprimer les applications préinstallées type Xbox, LinkedIn ou promotions équivalentes",
             DeviceTypeScope.All,
-            UserProfileScope.All));
+            UserProfileScope.All,
+            _automationService.RemoveBloatwareAsync));
 
         Tasks.Add(new SetupTask(
             "Afficher les icônes système sur le bureau",
             "Bureau → Clic droit → Personnaliser → Thèmes → Paramètres des icônes du bureau → activer Ordinateur, Fichiers de l’utilisateur et Corbeille",
             DeviceTypeScope.All,
-            UserProfileScope.All));
+            UserProfileScope.All,
+            _automationService.EnableDesktopIconsAsync));
 
         Tasks.Add(new SetupTask(
             "Réorganiser l’explorateur",
@@ -289,27 +308,142 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             4. Redémarrer la machine
             """,
             DeviceTypeScope.All,
-            UserProfileScope.All));
+            UserProfileScope.All,
+            _automationService.RunDiskCleanupAsync));
 
         Tasks.Add(new SetupTask(
             "Nettoyer les historiques et téléchargements",
             "Effacer l’historique des navigateurs et supprimer les fichiers temporaires ou téléchargements inutiles",
             DeviceTypeScope.All,
-            UserProfileScope.All));
+            UserProfileScope.All,
+            _automationService.ClearTemporaryDataAsync));
 
         Tasks.Add(new SetupTask(
             "Vérifications système (chkdsk & SFC)",
             "Win + X → Terminal/PowerShell (admin) → exécuter successivement ‘chkdsk c: /F’ (confirmer) puis ‘sfc /scannow’, redémarrer ensuite",
             DeviceTypeScope.All,
-            UserProfileScope.All));
+            UserProfileScope.All,
+            _automationService.RunSystemChecksAsync));
 
         Tasks.Add(new SetupTask(
             "Optimiser les lecteurs",
             "Ouvrir dfrgui ou Ce PC → clic droit sur C: → Propriétés → Outils → Optimiser chaque partition disponible",
             DeviceTypeScope.All,
-            UserProfileScope.All));
+            UserProfileScope.All,
+            _automationService.OptimizeDrivesAsync));
 
         TasksView.Refresh();
+    }
+
+    private async Task<AutomationRunSummary> RunAutomationTasksAsync(IProgress<string> progress, CancellationToken cancellationToken)
+    {
+        var applicableTasks = Tasks.Where(t => t.AppliesTo(SelectedDeviceType, SelectedUserProfile)).ToList();
+        var manualTasks = applicableTasks.Where(t => !t.HasAutomation).ToList();
+
+        foreach (var manualTask in manualTasks)
+        {
+            progress.Report($"[Checklist] Action manuelle requise : {manualTask.Title}");
+        }
+
+        var automatedTasks = applicableTasks.Where(t => t.HasAutomation).ToList();
+        var hadFailures = false;
+
+        foreach (var task in automatedTasks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            progress.Report($"[Checklist] Démarrage : {task.Title}");
+
+            var context = new SetupAutomationContext(
+                SelectedDeviceType,
+                SelectedUserProfile,
+                message =>
+                {
+                    if (string.IsNullOrWhiteSpace(message))
+                    {
+                        return;
+                    }
+
+                    if (message.StartsWith("[Checklist]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        progress.Report(message);
+                    }
+                    else
+                    {
+                        progress.Report($"[Checklist] {message}");
+                    }
+                });
+
+            AutomationResult result;
+            try
+            {
+                result = await task.ExecuteAsync(context, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                progress.Report($"[Checklist] Automatisation annulée pendant « {task.Title} ».");
+                throw;
+            }
+
+            if (result.IsSuccess)
+            {
+                if (!task.IsCompleted)
+                {
+                    task.IsCompleted = true;
+                }
+
+                progress.Report($"[Checklist] Terminé : {task.Title}");
+
+                if (!string.IsNullOrWhiteSpace(result.Message))
+                {
+                    progress.Report($"[Checklist] {result.Message}");
+                }
+            }
+            else
+            {
+                hadFailures = true;
+                var errorMessage = string.IsNullOrWhiteSpace(result.Message)
+                    ? "Une erreur est survenue."
+                    : result.Message;
+                progress.Report($"[Checklist] Échec : {task.Title} — {errorMessage}");
+            }
+        }
+
+        TasksView.Refresh();
+        return new AutomationRunSummary(automatedTasks.Any(), hadFailures);
+    }
+
+    private bool UpdateInstallTaskCompletion(bool packageFailures)
+    {
+        var installTask = Tasks.FirstOrDefault(t =>
+            string.Equals(t.Title, "Installer les navigateurs et utilitaires essentiels", StringComparison.OrdinalIgnoreCase));
+
+        if (installTask == null)
+        {
+            return false;
+        }
+
+        if (packageFailures)
+        {
+            installTask.IsCompleted = false;
+            TasksView.Refresh();
+            return false;
+        }
+
+        var allEssentialInstalled = Packages
+            .Where(p => EssentialPackageNames.Contains(p.Name))
+            .All(p => string.Equals(p.Status, "Installé", StringComparison.OrdinalIgnoreCase));
+
+        if (allEssentialInstalled)
+        {
+            installTask.IsCompleted = true;
+            TasksView.Refresh();
+            return true;
+        }
+
+        installTask.IsCompleted = false;
+        TasksView.Refresh();
+        return false;
     }
 
     private async void InstallButton_Click(object sender, RoutedEventArgs e)
@@ -320,9 +454,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         var selectedPackages = Packages.Where(p => p.IsSelected).ToList();
-        if (!selectedPackages.Any())
+        var applicableTasks = Tasks.Where(t => t.AppliesTo(SelectedDeviceType, SelectedUserProfile)).ToList();
+        var hasAutomatedTasks = applicableTasks.Any(t => t.HasAutomation);
+        var hasManualTasks = applicableTasks.Any(t => !t.HasAutomation);
+
+        if (!selectedPackages.Any() && !hasAutomatedTasks && !hasManualTasks)
         {
-            MessageBox.Show("Sélectionnez au moins un logiciel à installer.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Aucune action n'est disponible pour ce profil.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -352,6 +490,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _installationCts = new CancellationTokenSource();
         var cancellationToken = _installationCts.Token;
         var wasCancelled = false;
+        var automationFailures = false;
+        var packageFailures = false;
 
         IProgress<string> progress = new Progress<string>(message =>
         {
@@ -360,39 +500,84 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         try
         {
-            for (var i = 0; i < selectedPackages.Count; i++)
+            AutomationRunSummary automationSummary = new(false, false);
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var package = selectedPackages[i];
-                package.Status = "Installation en cours...";
-                package.IsProgressVisible = true;
-                package.Progress = 0;
-
-                progress.Report($"[{package.Name}] Démarrage de l'installation.");
-
-                var result = await InstallPackageAsync(package, progress, cancellationToken);
-                if (result.IsCanceled || cancellationToken.IsCancellationRequested)
-                {
-                    wasCancelled = true;
-                    CancelButton.IsEnabled = false;
-                }
-
-                if (wasCancelled)
-                {
-                    for (var j = i + 1; j < selectedPackages.Count; j++)
-                    {
-                        var pending = selectedPackages[j];
-                        pending.Status = "Annulé";
-                        pending.Progress = 0;
-                        pending.IsProgressVisible = false;
-                    }
-
-                    break;
-                }
+                automationSummary = await RunAutomationTasksAsync(progress, cancellationToken).ConfigureAwait(false);
+                automationFailures = automationSummary.HadFailures;
+            }
+            catch (OperationCanceledException)
+            {
+                wasCancelled = true;
             }
 
-            progress.Report(wasCancelled ? "Installation annulée." : "Installation terminée.");
+            if (wasCancelled)
+            {
+                progress.Report("[Checklist] Préparation annulée avant l'installation des applications.");
+            }
+            else if (selectedPackages.Any())
+            {
+                for (var i = 0; i < selectedPackages.Count; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var package = selectedPackages[i];
+                    package.Status = "Installation en cours...";
+                    package.IsProgressVisible = true;
+                    package.Progress = 0;
+
+                    progress.Report($"[{package.Name}] Démarrage de l'installation.");
+
+                    var result = await InstallPackageAsync(package, progress, cancellationToken);
+                    if (result.IsCanceled || cancellationToken.IsCancellationRequested)
+                    {
+                        wasCancelled = true;
+                        CancelButton.IsEnabled = false;
+                    }
+
+                    if (!result.IsSuccess)
+                    {
+                        packageFailures = true;
+                        if (!string.IsNullOrWhiteSpace(result.Message))
+                        {
+                            progress.Report($"[{package.Name}] {result.Message}");
+                        }
+                    }
+
+                    if (wasCancelled)
+                    {
+                        for (var j = i + 1; j < selectedPackages.Count; j++)
+                        {
+                            var pending = selectedPackages[j];
+                            pending.Status = "Annulé";
+                            pending.Progress = 0;
+                            pending.IsProgressVisible = false;
+                        }
+
+                        break;
+                    }
+                }
+
+                progress.Report(wasCancelled ? "Installation annulée." : "Installation terminée.");
+            }
+
+            if (!wasCancelled)
+            {
+                var installTaskCompleted = UpdateInstallTaskCompletion(packageFailures);
+                if (installTaskCompleted)
+                {
+                    progress.Report("[Checklist] Logiciels essentiels installés.");
+                }
+
+                if (automationFailures || packageFailures)
+                {
+                    progress.Report("[Checklist] Préparation terminée avec avertissements. Consultez le journal pour les détails.");
+                }
+                else
+                {
+                    progress.Report("[Checklist] Préparation terminée avec succès.");
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -409,7 +594,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 }
             }
 
-            progress.Report("Installation annulée.");
+            progress.Report("Préparation annulée.");
         }
         finally
         {
@@ -769,6 +954,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         return null;
     }
+
+    private sealed record AutomationRunSummary(bool RanAny, bool HadFailures);
 
     private sealed class ProgressSmoother : IDisposable
     {

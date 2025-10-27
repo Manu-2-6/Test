@@ -21,7 +21,7 @@
 
         <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0 0 0 16">
             <TextBlock Text="Préparez votre poste en installant les applications essentielles." FontSize="18" FontWeight="SemiBold" />
-            <TextBlock Text="Sélectionnez les logiciels à installer via winget puis cliquez sur &quot;Installer&quot;." Margin="0 6 0 0" />
+            <TextBlock Text="Sélectionnez les logiciels à installer via winget puis cliquez sur &quot;Lancer la préparation&quot; pour exécuter la checklist." Margin="0 6 0 0" />
         </StackPanel>
 
         <TabControl Grid.Row="1">
@@ -159,12 +159,12 @@
                     <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 16 0 16">
                         <Button x:Name="CancelButton"
                                 Content="Annuler"
-                                Width="140"
+                                Width="160"
                                 Height="36"
                                 Margin="0 0 12 0"
                                 IsEnabled="False"
                                 Click="CancelButton_Click" />
-                        <Button x:Name="InstallButton" Content="Installer" Width="140" Height="36" Click="InstallButton_Click" />
+                        <Button x:Name="InstallButton" Content="Lancer la préparation" Width="160" Height="36" Click="InstallButton_Click" />
                     </StackPanel>
 
                     <Border Grid.Row="2" Padding="12" CornerRadius="8" Background="#FFFFFF" BorderBrush="#D0D6E2" BorderThickness="1">
