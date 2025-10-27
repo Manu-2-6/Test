@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32;
@@ -58,65 +59,28 @@ public static class ChromeCustomizationService
         try
         {
             var existingValue = chromeKey.GetValue("ManagedBookmarks") as string;
-            var entries = new List<Dictionary<string, object?>>();
+            var entries = DeserializeManagedBookmarks(existingValue);
 
-            if (!string.IsNullOrWhiteSpace(existingValue))
+            var topLevel = entries.FirstOrDefault(e => !string.IsNullOrWhiteSpace(e.TopLevelName));
+            if (topLevel == null)
             {
-                try
-                {
-                    using var document = JsonDocument.Parse(existingValue);
-                    foreach (var element in document.RootElement.EnumerateArray())
-                    {
-                        var entry = new Dictionary<string, object?>();
-
-                        if (element.TryGetProperty("toplevel_name", out var toplevelElement))
-                        {
-                            entry["toplevel_name"] = toplevelElement.GetString();
-                            entries.Add(entry);
-                            continue;
-                        }
-
-                        if (element.TryGetProperty("name", out var nameElement))
-                        {
-                            var nameValue = nameElement.GetString();
-                            if (string.Equals(nameValue, "Google", StringComparison.OrdinalIgnoreCase))
-                            {
-                                // Ignore duplicate Google entry.
-                                continue;
-                            }
-
-                            entry["name"] = nameValue;
-                        }
-
-                        if (element.TryGetProperty("url", out var urlElement))
-                        {
-                            entry["url"] = urlElement.GetString();
-                        }
-
-                        if (entry.Count > 0)
-                        {
-                            entries.Add(entry);
-                        }
-                    }
-                }
-                catch (JsonException)
-                {
-                    entries.Clear();
-                }
+                topLevel = new ManagedBookmarkNode { TopLevelName = "Barre de favoris" };
+                entries.Insert(0, topLevel);
+            }
+            else
+            {
+                topLevel.TopLevelName = "Barre de favoris";
             }
 
-            if (!entries.Any(e => e.ContainsKey("toplevel_name")))
-            {
-                entries.Insert(0, new Dictionary<string, object?> { ["toplevel_name"] = "Favoris gérés" });
-            }
+            RemoveExistingGoogleBookmark(entries);
 
-            entries.Add(new Dictionary<string, object?>
+            entries.Add(new ManagedBookmarkNode
             {
-                ["name"] = "Google",
-                ["url"] = GoogleUrl
+                Name = "Google",
+                Url = GoogleUrl
             });
 
-            var managedBookmarksJson = JsonSerializer.Serialize(entries);
+            var managedBookmarksJson = JsonSerializer.Serialize(entries, SerializerOptions);
             chromeKey.SetValue("ManagedBookmarks", managedBookmarksJson, RegistryValueKind.String);
             progress.Report("[Google Chrome] Favori 'Google' ajouté à la barre des favoris.");
         }
@@ -124,6 +88,62 @@ public static class ChromeCustomizationService
         {
             progress.Report($"[Google Chrome] Impossible de mettre à jour les favoris gérés : {ex.Message}");
         }
+    }
+
+    private static List<ManagedBookmarkNode> DeserializeManagedBookmarks(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return new List<ManagedBookmarkNode>();
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<List<ManagedBookmarkNode>>(rawValue);
+            return parsed ?? new List<ManagedBookmarkNode>();
+        }
+        catch (JsonException)
+        {
+            return new List<ManagedBookmarkNode>();
+        }
+    }
+
+    private static void RemoveExistingGoogleBookmark(List<ManagedBookmarkNode> entries)
+    {
+        for (var i = entries.Count - 1; i >= 0; i--)
+        {
+            var entry = entries[i];
+            if (entry.Children != null && entry.Children.Count > 0)
+            {
+                RemoveExistingGoogleBookmark(entry.Children);
+            }
+
+            if (string.Equals(entry.Name, "Google", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(entry.Url, GoogleUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                entries.RemoveAt(i);
+            }
+        }
+    }
+
+    private static readonly JsonSerializerOptions SerializerOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    private sealed class ManagedBookmarkNode
+    {
+        [JsonPropertyName("toplevel_name")]
+        public string? TopLevelName { get; set; }
+
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
+
+        [JsonPropertyName("url")]
+        public string? Url { get; set; }
+
+        [JsonPropertyName("children")]
+        public List<ManagedBookmarkNode>? Children { get; set; }
     }
 
     private static void PinToTaskbar(IProgress<string> progress)
