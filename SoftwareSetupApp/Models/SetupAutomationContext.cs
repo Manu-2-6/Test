@@ -1,29 +1,30 @@
 using System;
 
-namespace SoftwareSetupApp.Models;
-
-public sealed class SetupAutomationContext
+namespace SoftwareSetupApp.Models
 {
-    private readonly Action<string> _logger;
-
-    public SetupAutomationContext(DeviceType deviceType, UserProfile userProfile, Action<string> logger)
+    public sealed class SetupAutomationContext
     {
-        DeviceType = deviceType;
-        UserProfile = userProfile;
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+        private readonly Action<string> _logger;
 
-    public DeviceType DeviceType { get; }
-
-    public UserProfile UserProfile { get; }
-
-    public void Report(string message)
-    {
-        if (string.IsNullOrWhiteSpace(message))
+        public SetupAutomationContext(DeviceType deviceType, UserProfile userProfile, Action<string> logger)
         {
-            return;
+            DeviceType = deviceType;
+            UserProfile = userProfile;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        _logger(message);
+        public DeviceType DeviceType { get; }
+
+        public UserProfile UserProfile { get; }
+
+        public void Report(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+
+            _logger(message);
+        }
     }
 }

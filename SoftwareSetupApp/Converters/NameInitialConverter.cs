@@ -2,26 +2,27 @@ using System;
 using System.Globalization;
 using System.Windows.Data;
 
-namespace SoftwareSetupApp.Converters;
-
-public class NameInitialConverter : IValueConverter
+namespace SoftwareSetupApp.Converters
 {
-    public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    public class NameInitialConverter : IValueConverter
     {
-        if (value is string name && !string.IsNullOrWhiteSpace(name))
+        public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            var trimmed = name.Trim();
-            if (trimmed.Length > 0)
+            if (value is string name && !string.IsNullOrWhiteSpace(name))
             {
-                return trimmed.Substring(0, 1).ToUpper(culture);
+                var trimmed = name.Trim();
+                if (trimmed.Length > 0)
+                {
+                    return trimmed.Substring(0, 1).ToUpper(culture);
+                }
             }
+
+            return string.Empty;
         }
 
-        return string.Empty;
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        return Binding.DoNothing;
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return Binding.DoNothing;
+        }
     }
 }

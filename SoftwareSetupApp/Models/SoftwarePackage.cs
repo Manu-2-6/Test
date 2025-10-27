@@ -2,99 +2,100 @@ using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace SoftwareSetupApp.Models;
-
-public class SoftwarePackage : INotifyPropertyChanged
+namespace SoftwareSetupApp.Models
 {
-    private bool _isSelected;
-    private string _status = "Prêt";
-    private string? _logoPath;
-    private int _progress;
-    private bool _isProgressVisible;
-
-    public SoftwarePackage(string name, string packageId)
+    public class SoftwarePackage : INotifyPropertyChanged
     {
-        Name = name;
-        PackageId = packageId;
-    }
+        private bool _isSelected;
+        private string _status = "Prêt";
+        private string? _logoPath;
+        private int _progress;
+        private bool _isProgressVisible;
 
-    public string Name { get; }
-
-    public string PackageId { get; }
-
-    public string? LogoPath
-    {
-        get => _logoPath;
-        set
+        public SoftwarePackage(string name, string packageId)
         {
-            if (_logoPath != value)
+            Name = name;
+            PackageId = packageId;
+        }
+
+        public string Name { get; }
+
+        public string PackageId { get; }
+
+        public string? LogoPath
+        {
+            get => _logoPath;
+            set
             {
-                _logoPath = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(HasLogo));
+                if (_logoPath != value)
+                {
+                    _logoPath = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(HasLogo));
+                }
             }
         }
-    }
 
-    public bool HasLogo => !string.IsNullOrWhiteSpace(_logoPath);
+        public bool HasLogo => !string.IsNullOrWhiteSpace(_logoPath);
 
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set
+        public bool IsSelected
         {
-            if (_isSelected != value)
+            get => _isSelected;
+            set
             {
-                _isSelected = value;
-                OnPropertyChanged();
+                if (_isSelected != value)
+                {
+                    _isSelected = value;
+                    OnPropertyChanged();
+                }
             }
         }
-    }
 
-    public string Status
-    {
-        get => _status;
-        set
+        public string Status
         {
-            if (_status != value)
+            get => _status;
+            set
             {
-                _status = value;
-                OnPropertyChanged();
+                if (_status != value)
+                {
+                    _status = value;
+                    OnPropertyChanged();
+                }
             }
         }
-    }
 
-    public int Progress
-    {
-        get => _progress;
-        set
+        public int Progress
         {
-            var clamped = Math.Max(0, Math.Min(100, value));
-            if (_progress != clamped)
+            get => _progress;
+            set
             {
-                _progress = clamped;
-                OnPropertyChanged();
+                var clamped = Math.Max(0, Math.Min(100, value));
+                if (_progress != clamped)
+                {
+                    _progress = clamped;
+                    OnPropertyChanged();
+                }
             }
         }
-    }
 
-    public bool IsProgressVisible
-    {
-        get => _isProgressVisible;
-        set
+        public bool IsProgressVisible
         {
-            if (_isProgressVisible != value)
+            get => _isProgressVisible;
+            set
             {
-                _isProgressVisible = value;
-                OnPropertyChanged();
+                if (_isProgressVisible != value)
+                {
+                    _isProgressVisible = value;
+                    OnPropertyChanged();
+                }
             }
         }
-    }
 
-    public event PropertyChangedEventHandler? PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 }
