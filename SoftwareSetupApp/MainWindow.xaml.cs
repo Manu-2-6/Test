@@ -693,7 +693,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void SelectAllCheckBox_Click(object sender, RoutedEventArgs e)
     {
-        var shouldSelectAll = Packages.Any(p => !p.IsSelected);
+        var shouldSelectAll = Packages.Any(p => !p.IsSelected || !p.ShouldSetAsDefault);
         SetAllPackagesSelection(shouldSelectAll);
     }
 
@@ -702,12 +702,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var package in Packages)
         {
             package.IsSelected = isSelected;
+            package.ShouldSetAsDefault = isSelected;
         }
     }
 
     private void PackageOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SoftwarePackage.IsSelected))
+        if (e.PropertyName == nameof(SoftwarePackage.IsSelected) ||
+            e.PropertyName == nameof(SoftwarePackage.ShouldSetAsDefault))
         {
             UpdateSelectAllState();
         }
@@ -740,11 +742,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void UpdateSelectAllState()
     {
         var selectedCount = Packages.Count(p => p.IsSelected);
-        if (selectedCount == 0)
+        var defaultCount = Packages.Count(p => p.ShouldSetAsDefault);
+
+        if (selectedCount == 0 && defaultCount == 0)
         {
             SelectAllCheckBox.IsChecked = false;
         }
-        else if (selectedCount == Packages.Count)
+        else if (selectedCount == Packages.Count && defaultCount == Packages.Count)
         {
             SelectAllCheckBox.IsChecked = true;
         }
