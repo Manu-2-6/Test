@@ -91,7 +91,7 @@ if (-not $hubs) {
         $regPath = Join-Path -Path $regPath -ChildPath 'Device Parameters';
 
         if (-not (Test-Path $regPath)) {
-            Write-Warning ("Paramètres introuvables pour " + $hub.InstanceId);
+            Write-Warning ('Paramètres introuvables pour ' + $hub.InstanceId);
             continue;
         }
 
@@ -128,7 +128,7 @@ if (-not $adapters) {
         $regPath = Join-Path -Path $regPath -ChildPath 'Device Parameters';
 
         if (-not (Test-Path $regPath)) {
-            Write-Warning ("Paramètres introuvables pour " + $adapter.Name);
+            Write-Warning ('Paramètres introuvables pour ' + $adapter.Name);
             continue;
         }
 
