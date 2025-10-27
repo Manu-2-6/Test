@@ -139,6 +139,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _installationCts = new CancellationTokenSource();
         var cancellationToken = _installationCts.Token;
         var wasCancelled = false;
+        var shouldShowChromeReminder = false;
 
         IProgress<string> progress = new Progress<string>(message =>
         {
@@ -165,6 +166,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     CancelButton.IsEnabled = false;
                 }
 
+                if (result.IsSuccess && package.IsChrome)
+                {
+                    shouldShowChromeReminder = true;
+                }
+
                 if (wasCancelled)
                 {
                     for (var j = i + 1; j < selectedPackages.Count; j++)
@@ -180,6 +186,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
 
             progress.Report(wasCancelled ? "Installation annulée." : "Installation terminée.");
+
+            if (!wasCancelled && shouldShowChromeReminder)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    var reminderWindow = new PostInstallReminderWindow
+                    {
+                        Owner = this
+                    };
+
+                    reminderWindow.ShowDialog();
+                });
+            }
         }
         catch (OperationCanceledException)
         {
