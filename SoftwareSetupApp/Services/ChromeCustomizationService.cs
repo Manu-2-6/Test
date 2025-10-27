@@ -61,17 +61,7 @@ public static class ChromeCustomizationService
             var existingValue = chromeKey.GetValue("ManagedBookmarks") as string;
             var entries = DeserializeManagedBookmarks(existingValue);
 
-            var topLevel = entries.FirstOrDefault(e => !string.IsNullOrWhiteSpace(e.TopLevelName));
-            if (topLevel == null)
-            {
-                topLevel = new ManagedBookmarkNode { TopLevelName = "Barre de favoris" };
-                entries.Insert(0, topLevel);
-            }
-            else
-            {
-                topLevel.TopLevelName = "Barre de favoris";
-            }
-
+            entries.RemoveAll(static e => !string.IsNullOrWhiteSpace(e.TopLevelName));
             RemoveExistingGoogleBookmark(entries);
 
             entries.Add(new ManagedBookmarkNode
