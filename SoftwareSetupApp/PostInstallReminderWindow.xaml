@@ -22,11 +22,12 @@
 
         <StackPanel Grid.Row="1"
                     Margin="0 0 0 16"
-                    Orientation="Vertical"
-                    Spacing="8">
+                    Orientation="Vertical">
             <TextBlock Text="• Définissez Google Chrome comme navigateur par défaut via Paramètres > Applications > Applications par défaut."
+                       Margin="0 0 0 8"
                        TextWrapping="Wrap" />
             <TextBlock Text="• Ouvrez Chrome et ajoutez https://www.google.com dans la barre des favoris (dossier &quot;Barre de favoris&quot;)."
+                       Margin="0 0 0 8"
                        TextWrapping="Wrap" />
             <TextBlock Text="• Épinglez Google Chrome à la barre des tâches si nécessaire."
                        TextWrapping="Wrap" />
