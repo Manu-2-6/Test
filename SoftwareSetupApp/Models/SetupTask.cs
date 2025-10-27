@@ -36,6 +36,7 @@ public enum UserProfile
 
 public class SetupTask : INotifyPropertyChanged
 {
+    private bool _isSelected = true;
     private bool _isCompleted;
 
     public SetupTask(
@@ -64,6 +65,24 @@ public class SetupTask : INotifyPropertyChanged
 
     public bool HasAutomation => AutomationAction != null;
 
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                OnPropertyChanged();
+
+                if (!value)
+                {
+                    IsCompleted = false;
+                }
+            }
+        }
+    }
+
     public bool IsCompleted
     {
         get => _isCompleted;
@@ -73,9 +92,12 @@ public class SetupTask : INotifyPropertyChanged
             {
                 _isCompleted = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(StatusText));
             }
         }
     }
+
+    public string StatusText => IsCompleted ? "Terminé" : "À exécuter";
 
     public bool AppliesTo(DeviceType deviceType, UserProfile profile)
     {

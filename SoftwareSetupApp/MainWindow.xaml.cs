@@ -337,7 +337,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private async Task<AutomationRunSummary> RunAutomationTasksAsync(IProgress<string> progress, CancellationToken cancellationToken)
     {
-        var applicableTasks = Tasks.Where(t => t.AppliesTo(SelectedDeviceType, SelectedUserProfile)).ToList();
+        var applicableTasks = Tasks
+            .Where(t => t.AppliesTo(SelectedDeviceType, SelectedUserProfile) && t.IsSelected)
+            .ToList();
         var manualTasks = applicableTasks.Where(t => !t.HasAutomation).ToList();
 
         foreach (var manualTask in manualTasks)
@@ -346,6 +348,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         var automatedTasks = applicableTasks.Where(t => t.HasAutomation).ToList();
+        foreach (var automatedTask in automatedTasks)
+        {
+            automatedTask.IsCompleted = false;
+        }
+
+        if (automatedTasks.Count == 0)
+        {
+            TasksView.Refresh();
+            return new AutomationRunSummary(false, false);
+        }
+
         var hadFailures = false;
 
         foreach (var task in automatedTasks)
@@ -423,6 +436,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return false;
         }
 
+        if (!installTask.IsSelected)
+        {
+            if (installTask.IsCompleted)
+            {
+                installTask.IsCompleted = false;
+            }
+
+            TasksView.Refresh();
+            return false;
+        }
+
         if (packageFailures)
         {
             installTask.IsCompleted = false;
@@ -454,7 +478,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         var selectedPackages = Packages.Where(p => p.IsSelected).ToList();
-        var applicableTasks = Tasks.Where(t => t.AppliesTo(SelectedDeviceType, SelectedUserProfile)).ToList();
+        var applicableTasks = Tasks
+            .Where(t => t.AppliesTo(SelectedDeviceType, SelectedUserProfile) && t.IsSelected)
+            .ToList();
         var hasAutomatedTasks = applicableTasks.Any(t => t.HasAutomation);
         var hasManualTasks = applicableTasks.Any(t => !t.HasAutomation);
 
