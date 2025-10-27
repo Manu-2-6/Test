@@ -199,10 +199,10 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0" Orientation="Vertical" Margin="0 0 0 12" Spacing="12">
-                        <TextBlock Text="Adaptez la checklist en fonction du poste à préparer." FontWeight="SemiBold" />
-                        <StackPanel Orientation="Horizontal" Spacing="24">
-                            <StackPanel Width="220">
+                    <StackPanel Grid.Row="0" Orientation="Vertical" Margin="0 0 0 12">
+                        <TextBlock Text="Adaptez la checklist en fonction du poste à préparer." FontWeight="SemiBold" Margin="0 0 0 12" />
+                        <StackPanel Orientation="Horizontal">
+                            <StackPanel Width="220" Margin="0 0 24 0">
                                 <TextBlock Text="Type d'ordinateur" FontWeight="SemiBold" Margin="0 0 0 4" />
                                 <ComboBox ItemsSource="{Binding DeviceTypeOptions}"
                                           SelectedValuePath="Value"
