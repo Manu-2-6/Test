@@ -390,7 +390,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             AutomationResult result;
             try
             {
-                result = await task.ExecuteAsync(context, cancellationToken).ConfigureAwait(false);
+                result = await task.ExecuteAsync(context, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -529,7 +529,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             AutomationRunSummary automationSummary = new(false, false);
             try
             {
-                automationSummary = await RunAutomationTasksAsync(progress, cancellationToken).ConfigureAwait(false);
+                automationSummary = await RunAutomationTasksAsync(progress, cancellationToken);
                 automationFailures = automationSummary.HadFailures;
             }
             catch (OperationCanceledException)
