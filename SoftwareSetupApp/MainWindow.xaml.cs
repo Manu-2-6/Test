@@ -169,7 +169,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return false;
         }
 
-        return task.AppliesTo(SelectedDeviceType, SelectedUserProfile);
+        task.UpdateApplicability(SelectedDeviceType, SelectedUserProfile);
+        return true;
     }
 
     private void InitializeTasks()
@@ -337,8 +338,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private async Task<AutomationRunSummary> RunAutomationTasksAsync(IProgress<string> progress, CancellationToken cancellationToken)
     {
+        TasksView.Refresh();
+
         var applicableTasks = Tasks
-            .Where(t => t.AppliesTo(SelectedDeviceType, SelectedUserProfile) && t.IsSelected)
+            .Where(t => t.IsApplicable && t.IsSelected)
             .ToList();
         var manualTasks = applicableTasks.Where(t => !t.HasAutomation).ToList();
 
@@ -478,8 +481,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         var selectedPackages = Packages.Where(p => p.IsSelected).ToList();
+        TasksView.Refresh();
+
         var applicableTasks = Tasks
-            .Where(t => t.AppliesTo(SelectedDeviceType, SelectedUserProfile) && t.IsSelected)
+            .Where(t => t.IsApplicable && t.IsSelected)
             .ToList();
         var hasAutomatedTasks = applicableTasks.Any(t => t.HasAutomation);
         var hasManualTasks = applicableTasks.Any(t => !t.HasAutomation);

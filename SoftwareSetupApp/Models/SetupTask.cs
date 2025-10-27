@@ -38,6 +38,8 @@ public class SetupTask : INotifyPropertyChanged
 {
     private bool _isSelected = true;
     private bool _isCompleted;
+    private bool _isApplicable = true;
+    private bool _autoDeselected;
 
     public SetupTask(
         string title,
@@ -73,6 +75,7 @@ public class SetupTask : INotifyPropertyChanged
             if (_isSelected != value)
             {
                 _isSelected = value;
+                _autoDeselected = false;
                 OnPropertyChanged();
 
                 if (!value)
@@ -97,13 +100,67 @@ public class SetupTask : INotifyPropertyChanged
         }
     }
 
-    public string StatusText => IsCompleted ? "Terminé" : "À exécuter";
+    public bool IsApplicable
+    {
+        get => _isApplicable;
+        private set
+        {
+            if (_isApplicable != value)
+            {
+                _isApplicable = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(StatusText));
+            }
+        }
+    }
+
+    public string StatusText
+    {
+        get
+        {
+            if (!IsApplicable)
+            {
+                return "Non applicable";
+            }
+
+            return IsCompleted ? "Terminé" : "À exécuter";
+        }
+    }
 
     public bool AppliesTo(DeviceType deviceType, UserProfile profile)
     {
         var deviceFlag = deviceType == DeviceType.Desktop ? DeviceTypeScope.Desktop : DeviceTypeScope.Laptop;
         var profileFlag = profile == UserProfile.Medic ? UserProfileScope.Medic : UserProfileScope.Standard;
         return DeviceScope.HasFlag(deviceFlag) && ProfileScope.HasFlag(profileFlag);
+    }
+
+    public void UpdateApplicability(DeviceType deviceType, UserProfile profile)
+    {
+        var applicable = AppliesTo(deviceType, profile);
+
+        if (!applicable)
+        {
+            if (_isSelected)
+            {
+                _isSelected = false;
+                _autoDeselected = true;
+                OnPropertyChanged(nameof(IsSelected));
+            }
+
+            if (_isCompleted)
+            {
+                _isCompleted = false;
+                OnPropertyChanged(nameof(IsCompleted));
+            }
+        }
+        else if (_autoDeselected && !_isSelected)
+        {
+            _autoDeselected = false;
+            _isSelected = true;
+            OnPropertyChanged(nameof(IsSelected));
+        }
+
+        IsApplicable = applicable;
     }
 
     public Task<AutomationResult> ExecuteAsync(SetupAutomationContext context, CancellationToken cancellationToken)
