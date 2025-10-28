@@ -150,70 +150,65 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     "$settingPattern = '(?i)(power setting guid|guid de param[^:]*):\\s*([0-9a-fA-F-]+).+Intel\\(R\\)'",
                     "$genericSettingPattern = '(?i)(power setting guid|guid de param[^:]*):\\s*[0-9a-fA-F-]+'",
                     "$subgroupPattern = '(?i)(subgroup guid|guid de sous-groupe[^:]*):\\s*([0-9a-fA-F-]+)'",
-                    "$possiblePatterns = @(
-                        '(?i)(possible setting index|index de param[^:]*possible)\\s*[:=]\\s*([0-9xXa-fA-F]+)\\s*-\\s*(.+)$'
-                    )",
+                    "$possiblePatterns = @(",
+                    "    '(?i)(possible setting index|index de param[^:]*possible)\\s*[:=]\\s*([0-9xXa-fA-F]+)\\s*-\\s*(.+)$'",
+                    ")",
                     "$currentSubgroupGuid = $null",
                     "$targetLineIndex = $null",
-                    "for ($i = 0; $i -lt $lines.Length; $i++) {
-                        $line = $lines[$i]
-                        if ($line -match $subgroupPattern) {
-                            $currentSubgroupGuid = $matches[2]
-                            continue
-                        }
-
-                        if ($line -match $settingPattern) {
-                            $settingGuid = $matches[2]
-                            $subgroupGuid = $currentSubgroupGuid
-                            $targetLineIndex = $i
-                            break
-                        }
-                    }",
+                    "for ($i = 0; $i -lt $lines.Length; $i++) {",
+                    "    $line = $lines[$i]",
+                    "    if ($line -match $subgroupPattern) {",
+                    "        $currentSubgroupGuid = $matches[2]",
+                    "        continue",
+                    "    }",
+                    "    if ($line -match $settingPattern) {",
+                    "        $settingGuid = $matches[2]",
+                    "        $subgroupGuid = $currentSubgroupGuid",
+                    "        $targetLineIndex = $i",
+                    "        break",
+                    "    }",
+                    "}",
                     "$maxPerf = $null",
                     "$allCandidates = @()",
-                    "if ($settingGuid -and $subgroupGuid -and $targetLineIndex -ne $null) {
-                        for ($j = $targetLineIndex + 1; $j -lt $lines.Length; $j++) {
-                            $nextLine = $lines[$j]
-                            if ($nextLine -match $genericSettingPattern -or $nextLine -match $subgroupPattern) {
-                                break
-                            }
-
-                            foreach ($pattern in $possiblePatterns) {
-                                if ($nextLine -match $pattern) {
-                                    $rawIndex = $matches[2]
-                                    $label = ($matches[3] | ForEach-Object { $_.Trim() })
-                                    if ($rawIndex -match '^0x') {
-                                        $numericIndex = [Convert]::ToInt32($rawIndex, 16)
-                                        $normalizedRaw = ('0x{0:x8}' -f $numericIndex)
-                                    } else {
-                                        $numericIndex = [int]$rawIndex
-                                        $normalizedRaw = $numericIndex
-                                    }
-
-                                    $candidate = [PSCustomObject]@{ Raw = $normalizedRaw; Value = $numericIndex; Label = $label }
-                                    $allCandidates += $candidate
-
-                                    if ($label -match '(?i)(maximum performance|performances? maximales?|performances? élevées?|haute performance|hautes performances)') {
-                                        $maxPerf = $candidate
-                                    }
-                                    break
-                                }
-                            }
-                        }
-
-                        if (-not $maxPerf -and $allCandidates.Count -gt 0) {
-                            $maxPerf = $allCandidates | Sort-Object Value -Descending | Select-Object -First 1
-                        }
-                    }",
-                    "if ($settingGuid -and $subgroupGuid -and $maxPerf) {
-                        $valueToSet = $maxPerf.Raw
-                        powercfg -setacvalueindex SCHEME_CURRENT $subgroupGuid $settingGuid $valueToSet
-                        powercfg -setdcvalueindex SCHEME_CURRENT $subgroupGuid $settingGuid $valueToSet
-                        powercfg -S SCHEME_CURRENT
-                        Write-Output (\"Paramètres graphiques Intel(R) configurés sur \" + $valueToSet + \" (performances maximales) pour secteur et batterie.\")
-                    } else {
-                        Write-Output 'Paramètres graphiques Intel(R) introuvables ou valeur maximale non détectée : aucune modification appliquée.'
-                    }"
+                    "if ($settingGuid -and $subgroupGuid -and $targetLineIndex -ne $null) {",
+                    "    for ($j = $targetLineIndex + 1; $j -lt $lines.Length; $j++) {",
+                    "        $nextLine = $lines[$j]",
+                    "        if ($nextLine -match $genericSettingPattern -or $nextLine -match $subgroupPattern) {",
+                    "            break",
+                    "        }",
+                    "        foreach ($pattern in $possiblePatterns) {",
+                    "            if ($nextLine -match $pattern) {",
+                    "                $rawIndex = $matches[2]",
+                    "                $label = ($matches[3] | ForEach-Object { $_.Trim() })",
+                    "                if ($rawIndex -match '^0x') {",
+                    "                    $numericIndex = [Convert]::ToInt32($rawIndex, 16)",
+                    "                    $normalizedRaw = ('0x{0:x8}' -f $numericIndex)",
+                    "                } else {",
+                    "                    $numericIndex = [int]$rawIndex",
+                    "                    $normalizedRaw = $numericIndex",
+                    "                }",
+                    "                $candidate = [PSCustomObject]@{ Raw = $normalizedRaw; Value = $numericIndex; Label = $label }",
+                    "                $allCandidates += $candidate",
+                    "                if ($label -match '(?i)(maximum performance|performances? maximales?|performances? élevées?|haute performance|hautes performances)') {",
+                    "                    $maxPerf = $candidate",
+                    "                }",
+                    "                break",
+                    "            }",
+                    "        }",
+                    "    }",
+                    "    if (-not $maxPerf -and $allCandidates.Count -gt 0) {",
+                    "        $maxPerf = $allCandidates | Sort-Object Value -Descending | Select-Object -First 1",
+                    "    }",
+                    "}",
+                    "if ($settingGuid -and $subgroupGuid -and $maxPerf) {",
+                    "    $valueToSet = $maxPerf.Raw",
+                    "    powercfg -setacvalueindex SCHEME_CURRENT $subgroupGuid $settingGuid $valueToSet",
+                    "    powercfg -setdcvalueindex SCHEME_CURRENT $subgroupGuid $settingGuid $valueToSet",
+                    "    powercfg -S SCHEME_CURRENT",
+                    "    Write-Output (\"Paramètres graphiques Intel(R) configurés sur \" + $valueToSet + \" (performances maximales) pour secteur et batterie.\")",
+                    "} else {",
+                    "    Write-Output 'Paramètres graphiques Intel(R) introuvables ou valeur maximale non détectée : aucune modification appliquée.'",
+                    "}"
                 })
             {
                 Description = "Active les performances maximales pour la stratégie d’alimentation des graphiques Intel(R) sur secteur et sur batterie lorsque l’option est disponible."
