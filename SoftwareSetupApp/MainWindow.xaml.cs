@@ -137,6 +137,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 Description = "Met la veille écran sur 30 minutes, la veille PC sur 45 minutes et règle la luminosité à 100 % (mode Pro : veille PC désactivée)."
             });
 
+        ConfigurationTasks.Add(
+            new ConfigurationTask(
+                "Optimiser la stratégie d’alimentation des graphiques Intel(R)",
+                new[]
+                {
+                    "$ErrorActionPreference = 'Stop'",
+                    "$powerCfgOutput = powercfg /Q",
+                    "$lines = $powerCfgOutput -split \"`r?`n\"",
+                    "$settingGuid = $null",
+                    "$settingLineIndex = $null",
+                    "$settingPattern = '(?i)(power setting guid|guid de param[^:]+):\\s*([0-9a-fA-F-]+).+Intel\\(R\\)'",
+                    "for ($i = 0; $i -lt $lines.Length; $i++) { if ($lines[$i] -match $settingPattern) { $settingGuid = $matches[2]; $settingLineIndex = $i; break } }",
+                    "$subgroupGuid = $null",
+                    "$subgroupPattern = '(?i)(subgroup guid|guid de sous-groupe[^:]+):\\s*([0-9a-fA-F-]+)'",
+                    "if ($settingGuid -and $settingLineIndex -ne $null) { for ($j = $settingLineIndex; $j -ge 0; $j--) { if ($lines[$j] -match $subgroupPattern) { $subgroupGuid = $matches[2]; break } } }",
+                    "if ($settingGuid -and $subgroupGuid) { powercfg -setacvalueindex SCHEME_CURRENT $subgroupGuid $settingGuid 2; powercfg -setdcvalueindex SCHEME_CURRENT $subgroupGuid $settingGuid 2; powercfg -S SCHEME_CURRENT; Write-Output 'Paramètres graphiques Intel(R) configurés sur performances maximales pour secteur et batterie.' } else { Write-Output 'Paramètres graphiques Intel(R) introuvables : aucune modification appliquée.' }"
+                })
+            {
+                Description = "Active les performances maximales pour la stratégie d’alimentation des graphiques Intel(R) sur secteur et sur batterie lorsque l’option est disponible."
+            });
+
         foreach (var task in ConfigurationTasks)
         {
             task.PropertyChanged += TaskOnPropertyChanged;
