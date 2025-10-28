@@ -148,11 +148,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     "$settingGuid = $null",
                     "$settingLineIndex = $null",
                     "$settingPattern = '(?i)(power setting guid|guid de param[^:]+):\\s*([0-9a-fA-F-]+).+Intel\\(R\\)'",
+                    "$genericSettingPattern = '(?i)(power setting guid|guid de param[^:]+):\\s*[0-9a-fA-F-]+'",
                     "for ($i = 0; $i -lt $lines.Length; $i++) { if ($lines[$i] -match $settingPattern) { $settingGuid = $matches[2]; $settingLineIndex = $i; break } }",
                     "$subgroupGuid = $null",
                     "$subgroupPattern = '(?i)(subgroup guid|guid de sous-groupe[^:]+):\\s*([0-9a-fA-F-]+)'",
-                    "if ($settingGuid -and $settingLineIndex -ne $null) { for ($j = $settingLineIndex; $j -ge 0; $j--) { if ($lines[$j] -match $subgroupPattern) { $subgroupGuid = $matches[2]; break } } }",
-                    "if ($settingGuid -and $subgroupGuid) { powercfg -setacvalueindex SCHEME_CURRENT $subgroupGuid $settingGuid 2; powercfg -setdcvalueindex SCHEME_CURRENT $subgroupGuid $settingGuid 2; powercfg -S SCHEME_CURRENT; Write-Output 'Paramètres graphiques Intel(R) configurés sur performances maximales pour secteur et batterie.' } else { Write-Output 'Paramètres graphiques Intel(R) introuvables : aucune modification appliquée.' }"
+                    "if ($settingGuid -and $settingLineIndex -ne $null) { for ($j = $settingLineIndex; $j -ge 0; $j--) { if ($lines[$j] -match $subgroupPattern) { $subgroupGuid = $matches[2]; break } if ($lines[$j] -match $genericSettingPattern -and $j -lt $settingLineIndex) { break } } }",
+                    "$maxPerfIndex = $null",
+                    "$possiblePattern = '(?i)possible setting index:?\\s*([0-9xXa-fA-F]+)\\s*-\\s*(.+)$'",
+                    "if ($settingGuid -and $settingLineIndex -ne $null) { for ($k = $settingLineIndex + 1; $k -lt $lines.Length; $k++) { $line = $lines[$k]; if ($line -match $genericSettingPattern -or $line -match $subgroupPattern) { break } if ($line -match $possiblePattern) { $candidateIndex = $matches[1]; $candidateLabel = $matches[2]; if ($candidateLabel -match '(?i)(maximum performance|performances? maximales?|performances? élevées?|haute performance)') { if ($candidateIndex -match '^0x') { $maxPerfIndex = [Convert]::ToInt32($candidateIndex, 16); } else { $maxPerfIndex = [int]$candidateIndex; } break } } } }",
+                    "if ($null -eq $maxPerfIndex) { $maxPerfIndex = 2 }",
+                    "if ($settingGuid -and $subgroupGuid -and $maxPerfIndex -ne $null) { powercfg -setacvalueindex SCHEME_CURRENT $subgroupGuid $settingGuid $maxPerfIndex; powercfg -setdcvalueindex SCHEME_CURRENT $subgroupGuid $settingGuid $maxPerfIndex; powercfg -S SCHEME_CURRENT; Write-Output \"Paramètres graphiques Intel(R) configurés sur index $maxPerfIndex (performances maximales) pour secteur et batterie.\" } else { Write-Output 'Paramètres graphiques Intel(R) introuvables ou valeur maximale non détectée : aucune modification appliquée.' }"
                 })
             {
                 Description = "Active les performances maximales pour la stratégie d’alimentation des graphiques Intel(R) sur secteur et sur batterie lorsque l’option est disponible."
