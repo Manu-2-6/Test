@@ -36,6 +36,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string? _lastLogEntry;
     private ScrollViewer? _logScrollViewer;
     private bool _shouldAutoScroll = true;
+    private bool _isProfessionalMode;
 
     public ObservableCollection<SoftwarePackage> Packages { get; } = new();
     public ObservableCollection<ConfigurationTask> ConfigurationTasks { get; } = new();
@@ -111,6 +112,31 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 Description = "Désactive la suspension sélective USB sur secteur et batterie."
             });
 
+        ConfigurationTasks.Add(
+            new ConfigurationTask(
+                "Configurer la veille et la luminosité sur secteur",
+                new[]
+                {
+                    "powercfg /change monitor-timeout-ac 30",
+                    "powercfg /change standby-timeout-ac 45",
+                    "Add-Type -AssemblyName System.Windows.Forms",
+                    "Add-Type -AssemblyName System.Management",
+                    "$brightness = 100",
+                    "(Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods).WmiSetBrightness(1, $brightness)"
+                },
+                new[]
+                {
+                    "powercfg /change monitor-timeout-ac 30",
+                    "powercfg /change standby-timeout-ac 0",
+                    "Add-Type -AssemblyName System.Windows.Forms",
+                    "Add-Type -AssemblyName System.Management",
+                    "$brightness = 100",
+                    "(Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods).WmiSetBrightness(1, $brightness)"
+                })
+            {
+                Description = "Met la veille écran sur 30 minutes, la veille PC sur 45 minutes et règle la luminosité à 100 % (mode Pro : veille PC désactivée)."
+            });
+
         foreach (var task in ConfigurationTasks)
         {
             task.PropertyChanged += TaskOnPropertyChanged;
@@ -119,6 +145,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         LoadPackageLogos();
         UpdateProgramsSelectAllState();
         UpdateTasksSelectAllState();
+        ApplyProfessionalModeToTasks();
     }
 
     private async void InstallButton_Click(object sender, RoutedEventArgs e)
@@ -149,6 +176,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         CancelButton.IsEnabled = true;
         ProgramsSelectAllCheckBox.IsEnabled = false;
         TasksSelectAllCheckBox.IsEnabled = false;
+        ProModeCheckBox.IsEnabled = false;
         PackagesList.IsEnabled = false;
         TasksList.IsEnabled = false;
         Logs.Clear();
@@ -306,10 +334,25 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             CancelButton.IsEnabled = false;
             ProgramsSelectAllCheckBox.IsEnabled = true;
             TasksSelectAllCheckBox.IsEnabled = true;
+            ProModeCheckBox.IsEnabled = true;
             PackagesList.IsEnabled = true;
             TasksList.IsEnabled = true;
             UpdateProgramsSelectAllState();
             UpdateTasksSelectAllState();
+        }
+    }
+
+    public bool IsProfessionalMode
+    {
+        get => _isProfessionalMode;
+        set
+        {
+            if (_isProfessionalMode != value)
+            {
+                _isProfessionalMode = value;
+                OnPropertyChanged(nameof(IsProfessionalMode));
+                ApplyProfessionalModeToTasks();
+            }
         }
     }
 
@@ -797,6 +840,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var task in ConfigurationTasks)
         {
             task.IsSelected = isSelected;
+        }
+    }
+
+    private void ApplyProfessionalModeToTasks()
+    {
+        foreach (var task in ConfigurationTasks)
+        {
+            task.ApplyProfessionalMode(IsProfessionalMode);
         }
     }
 

@@ -159,12 +159,19 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <CheckBox x:Name="TasksSelectAllCheckBox"
-                                  Grid.Row="0"
-                                  Content="Tout sélectionner"
-                                  Margin="0 0 0 8"
-                                  IsThreeState="True"
-                                  Click="TasksSelectAllCheckBox_Click" />
+                        <StackPanel Grid.Row="0"
+                                    Orientation="Horizontal"
+                                    Margin="0 0 0 8">
+                            <CheckBox x:Name="TasksSelectAllCheckBox"
+                                      Content="Tout sélectionner"
+                                      IsThreeState="True"
+                                      Click="TasksSelectAllCheckBox_Click" />
+                            <CheckBox x:Name="ProModeCheckBox"
+                                      Content="Pro"
+                                      Margin="12 0 0 0"
+                                      VerticalAlignment="Center"
+                                      IsChecked="{Binding IsProfessionalMode, Mode=TwoWay}" />
+                        </StackPanel>
                         <ListView x:Name="TasksList"
                                   Grid.Row="1"
                                   ItemsSource="{Binding ConfigurationTasks}"

@@ -8,18 +8,31 @@ namespace SoftwareSetupApp.Models;
 
 public class ConfigurationTask : INotifyPropertyChanged
 {
+    private readonly List<string> _defaultCommands;
+    private readonly List<string> _currentCommands;
+    private readonly List<string>? _professionalCommands;
     private bool _isSelected;
     private string _status = "Prêt";
 
-    public ConfigurationTask(string name, IEnumerable<string> commands)
+    public ConfigurationTask(string name, IEnumerable<string> commands, IEnumerable<string>? professionalCommands = null)
     {
         Name = name;
-        Commands = new ReadOnlyCollection<string>(commands?.ToList() ?? new List<string>());
+        _defaultCommands = commands?.ToList() ?? new List<string>();
+        _currentCommands = new List<string>(_defaultCommands);
+
+        if (professionalCommands != null)
+        {
+            _professionalCommands = professionalCommands.ToList();
+        }
+
+        Commands = new ReadOnlyCollection<string>(_currentCommands);
     }
 
     public string Name { get; }
 
     public ReadOnlyCollection<string> Commands { get; }
+
+    public bool HasProfessionalVariant => _professionalCommands != null;
 
     public string? Description { get; init; }
 
@@ -50,6 +63,27 @@ public class ConfigurationTask : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    public void ApplyProfessionalMode(bool isProfessional)
+    {
+        var source = isProfessional && _professionalCommands != null
+            ? _professionalCommands
+            : _defaultCommands;
+
+        UpdateCommands(source);
+    }
+
+    private void UpdateCommands(IEnumerable<string> commands)
+    {
+        _currentCommands.Clear();
+
+        foreach (var command in commands)
+        {
+            _currentCommands.Add(command);
+        }
+
+        OnPropertyChanged(nameof(Commands));
+    }
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
