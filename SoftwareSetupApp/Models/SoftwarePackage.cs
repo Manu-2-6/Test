@@ -12,15 +12,18 @@ public class SoftwarePackage : INotifyPropertyChanged
     private int _progress;
     private bool _isProgressVisible;
 
-    public SoftwarePackage(string name, string packageId)
+    public SoftwarePackage(string name, string packageId, string? source = null)
     {
         Name = name;
         PackageId = packageId;
+        Source = string.IsNullOrWhiteSpace(source) ? null : source;
     }
 
     public string Name { get; }
 
     public string PackageId { get; }
+
+    public string? Source { get; }
 
     public string? LogoPath
     {

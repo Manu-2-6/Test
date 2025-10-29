@@ -29,7 +29,15 @@ public class WingetInstaller
         IProgress<int>? percentProgress,
         CancellationToken cancellationToken)
     {
-        var arguments = $"install --id \"{package.PackageId}\" --silent --accept-package-agreements --accept-source-agreements";
+        var argumentsBuilder = new StringBuilder();
+        argumentsBuilder.Append($"install --id \"{package.PackageId}\" --silent --accept-package-agreements --accept-source-agreements");
+
+        if (!string.IsNullOrWhiteSpace(package.Source))
+        {
+            argumentsBuilder.Append($" --source \"{package.Source}\"");
+        }
+
+        var arguments = argumentsBuilder.ToString();
 
         var startInfo = new ProcessStartInfo
         {

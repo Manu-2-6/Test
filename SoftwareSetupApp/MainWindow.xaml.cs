@@ -90,10 +90,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Directory.CreateDirectory(directory);
         }
 
-        Packages.Add(new SoftwarePackage("VLC", "VideoLAN.VLC"));
-        Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome"));
-        Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
-        Packages.Add(new SoftwarePackage("LibreOffice", "TheDocumentFoundation.LibreOffice"));
+        const string WingetSource = "winget";
+
+        Packages.Add(new SoftwarePackage("VLC", "VideoLAN.VLC", WingetSource));
+        Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome", WingetSource));
+        Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit", WingetSource));
+        Packages.Add(new SoftwarePackage("LibreOffice", "TheDocumentFoundation.LibreOffice", WingetSource));
 
         foreach (var package in Packages)
         {
