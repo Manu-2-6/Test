@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Security.Principal;
 using System.Windows;
 
@@ -14,11 +15,15 @@ public partial class App : Application
         {
             try
             {
+                var exePath = Environment.ProcessPath;
+                var workingDirectory = exePath is null ? null : Path.GetDirectoryName(exePath);
+
                 var processInfo = new ProcessStartInfo
                 {
-                    FileName = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty,
+                    FileName = exePath ?? string.Empty,
                     UseShellExecute = true,
-                    Verb = "runas"
+                    Verb = "runas",
+                    WorkingDirectory = workingDirectory
                 };
 
                 if (string.IsNullOrWhiteSpace(processInfo.FileName))
