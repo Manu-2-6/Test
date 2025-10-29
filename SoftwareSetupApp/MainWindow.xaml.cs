@@ -137,6 +137,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 Description = "Met la veille écran sur 30 minutes, la veille PC sur 45 minutes et règle la luminosité à 100 % (mode Pro : veille PC désactivée)."
             });
 
+        ConfigurationTasks.Add(
+            new ConfigurationTask(
+                "Configurer l'arrêt des disques",
+                new[]
+                {
+                    "powercfg /change disk-timeout-ac 0",
+                    "powercfg /change disk-timeout-dc 0"
+                })
+            {
+                Description = "Règle l'arrêt des disques durs sur 0 minute (jamais) sur secteur et batterie."
+            });
+
         foreach (var task in ConfigurationTasks)
         {
             task.PropertyChanged += TaskOnPropertyChanged;
