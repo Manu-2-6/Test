@@ -7,10 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <ApplicationDefinition Include="App.xaml">
+    <ApplicationDefinition Update="App.xaml">
       <Generator>MSBuild:Compile</Generator>
     </ApplicationDefinition>
-    <Page Include="MainWindow.xaml">
+    <Page Update="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Content Include="Assets\Logos\**">
