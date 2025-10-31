@@ -10,7 +10,7 @@
         Title="Post-installation W11 Setup" Height="500" Width="680"
         MinWidth="620" MinHeight="420"
         UseLayoutRounding="True"
-        Icon="/SoftwareSetupApp;component/Assets/Logos/Amix.png">
+        Icon="/SoftwareSetupApp;component/Assets/Logos/icone_A.png">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <converters:NameInitialConverter x:Key="NameInitialConverter" />
@@ -28,7 +28,7 @@
             <StackPanel Orientation="Horizontal"
                         Margin="0 0 0 12"
                         VerticalAlignment="Center">
-                <Image Source="/SoftwareSetupApp;component/Assets/Logos/Amix.png"
+                <Image Source="/SoftwareSetupApp;component/Assets/Logos/icone_A.png"
                        Width="140"
                        Height="140"
                        Stretch="Uniform"
