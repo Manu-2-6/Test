@@ -81,6 +81,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         InitializeComponent();
         DataContext = this;
 
+        Loaded += (_, _) => PositionWindowOnRightHalf();
+
         _logoDirectories = BuildLogoDirectories();
 
         ((INotifyCollectionChanged)Logs).CollectionChanged += LogsOnCollectionChanged;
@@ -173,6 +175,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         UpdateProgramsSelectAllState();
         UpdateTasksSelectAllState();
         ApplyProfessionalModeToTasks();
+    }
+
+    private void PositionWindowOnRightHalf()
+    {
+        var workArea = SystemParameters.WorkArea;
+
+        var targetWidth = Math.Max(MinWidth, workArea.Width / 2);
+        targetWidth = Math.Min(targetWidth, workArea.Width);
+
+        var targetHeight = Math.Max(MinHeight, workArea.Height);
+        targetHeight = Math.Min(targetHeight, workArea.Height);
+
+        Width = targetWidth;
+        Height = targetHeight;
+        Left = workArea.Left + workArea.Width - Width;
+        Top = workArea.Top;
     }
 
     private async void InstallButton_Click(object sender, RoutedEventArgs e)
