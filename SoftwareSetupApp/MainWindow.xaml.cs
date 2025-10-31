@@ -82,7 +82,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         InitializeComponent();
         DataContext = this;
 
-        Icon = new BitmapImage(new Uri("pack://application:,,,/SoftwareSetupApp;component/Assets/Logos/Amix.jpg"));
+        Icon = new BitmapImage(new Uri("pack://application:,,,/SoftwareSetupApp;component/Assets/Logos/Amix.png"));
 
         Loaded += (_, _) => PositionWindowOnRightHalf();
 
