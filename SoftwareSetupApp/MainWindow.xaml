@@ -31,6 +31,7 @@
                        Width="140"
                        Height="140"
                        Stretch="Uniform"
+                       RenderOptions.BitmapScalingMode="HighQuality"
                        SnapsToDevicePixels="True" />
             </StackPanel>
             <TextBlock Text="Sélectionnez les logiciels winget ou les tâches Windows à appliquer puis cliquez sur &quot;Installer&quot;."
