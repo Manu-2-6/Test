@@ -27,8 +27,8 @@
                         Margin="0 0 0 12"
                         VerticalAlignment="Center">
                 <Image Source="/SoftwareSetupApp;component/Assets/Logos/Amix.jpg"
-                       Width="80"
-                       Height="80"
+                       Width="100"
+                       Height="100"
                        Stretch="Uniform"
                        SnapsToDevicePixels="True" />
             </StackPanel>
