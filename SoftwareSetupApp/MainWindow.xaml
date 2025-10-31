@@ -7,7 +7,7 @@
         xmlns:converters="clr-namespace:SoftwareSetupApp.Converters"
         xmlns:models="clr-namespace:SoftwareSetupApp.Models"
         mc:Ignorable="d"
-        Title="Post-installation Setup" Height="500" Width="680"
+        Title="Post-installation W11 Setup" Height="500" Width="680"
         MinWidth="620" MinHeight="420"
         Icon="/SoftwareSetupApp;component/Assets/Logos/Amix.jpg">
     <Window.Resources>
@@ -33,7 +33,10 @@
                        Stretch="Uniform"
                        SnapsToDevicePixels="True" />
             </StackPanel>
-            <TextBlock Text="Sélectionnez les logiciels winget ou les tâches Windows à appliquer puis cliquez sur &quot;Installer&quot;." Margin="0 6 0 0" />
+            <TextBlock Text="Sélectionnez les logiciels winget ou les tâches Windows à appliquer puis cliquez sur &quot;Installer&quot;."
+                       Margin="0 6 0 0"
+                       FontWeight="Bold"
+                       FontSize="16" />
         </StackPanel>
 
         <TabControl Grid.Row="1" Margin="0">
