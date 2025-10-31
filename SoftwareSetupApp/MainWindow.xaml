@@ -9,6 +9,7 @@
         mc:Ignorable="d"
         Title="Post-installation W11 Setup" Height="500" Width="680"
         MinWidth="620" MinHeight="420"
+        UseLayoutRounding="True"
         Icon="/SoftwareSetupApp;component/Assets/Logos/Amix.png">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
@@ -91,6 +92,8 @@
                                                 <Image Width="32"
                                                        Height="32"
                                                        Stretch="Uniform"
+                                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                                       SnapsToDevicePixels="True"
                                                        Source="{Binding LogoPath}">
                                                     <Image.Style>
                                                         <Style TargetType="Image">
