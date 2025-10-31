@@ -9,7 +9,7 @@
         mc:Ignorable="d"
         Title="Post-installation W11 Setup" Height="500" Width="680"
         MinWidth="620" MinHeight="420"
-        Icon="/SoftwareSetupApp;component/Assets/Logos/Amix.jpg">
+        Icon="/SoftwareSetupApp;component/Assets/Logos/Amix.png">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <converters:NameInitialConverter x:Key="NameInitialConverter" />
@@ -27,10 +27,11 @@
             <StackPanel Orientation="Horizontal"
                         Margin="0 0 0 12"
                         VerticalAlignment="Center">
-                <Image Source="/SoftwareSetupApp;component/Assets/Logos/Amix.jpg"
+                <Image Source="/SoftwareSetupApp;component/Assets/Logos/Amix.png"
                        Width="140"
                        Height="140"
                        Stretch="Uniform"
+                       RenderOptions.BitmapScalingMode="HighQuality"
                        SnapsToDevicePixels="True" />
             </StackPanel>
             <TextBlock Text="Sélectionnez les logiciels winget ou les tâches Windows à appliquer puis cliquez sur &quot;Installer&quot;."
