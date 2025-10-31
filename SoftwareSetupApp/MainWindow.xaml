@@ -8,7 +8,8 @@
         xmlns:models="clr-namespace:SoftwareSetupApp.Models"
         mc:Ignorable="d"
         Title="Post-installation Setup" Height="500" Width="680"
-        MinWidth="620" MinHeight="420">
+        MinWidth="620" MinHeight="420"
+        Icon="/SoftwareSetupApp;component/Assets/Logos/Amix.jpg">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <converters:NameInitialConverter x:Key="NameInitialConverter" />
@@ -27,8 +28,8 @@
                         Margin="0 0 0 12"
                         VerticalAlignment="Center">
                 <Image Source="/SoftwareSetupApp;component/Assets/Logos/Amix.jpg"
-                       Width="100"
-                       Height="100"
+                       Width="140"
+                       Height="140"
                        Stretch="Uniform"
                        SnapsToDevicePixels="True" />
             </StackPanel>

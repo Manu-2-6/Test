@@ -12,6 +12,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using SoftwareSetupApp.Models;
 using SoftwareSetupApp.Services;
@@ -80,6 +81,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         InitializeComponent();
         DataContext = this;
+
+        Icon = new BitmapImage(new Uri("pack://application:,,,/SoftwareSetupApp;component/Assets/Logos/Amix.jpg"));
 
         Loaded += (_, _) => PositionWindowOnRightHalf();
 
