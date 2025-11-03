@@ -4,14 +4,17 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -563,7 +566,7 @@ if ($target -ne [IntPtr]::Zero) {
         InitializeComponent();
         DataContext = this;
 
-        Icon = new BitmapImage(new Uri("pack://application:,,,/SoftwareSetupApp;component/Assets/Logos/icone_A.png"));
+        Icon = LoadHighQualityIcon("pack://application:,,,/SoftwareSetupApp;component/Assets/Logos/icone_A.png");
 
         Loaded += (_, _) => PositionWindowOnRightHalf();
 
@@ -1575,5 +1578,41 @@ if ($target -ne [IntPtr]::Zero) {
     private void OnPropertyChanged(string propertyName)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private static ImageSource LoadHighQualityIcon(string resourcePath)
+    {
+        var iconUri = new Uri(resourcePath, UriKind.Absolute);
+        var resourceInfo = Application.GetResourceStream(iconUri)
+                            ?? throw new InvalidOperationException($"Impossible de charger l'icône '{resourcePath}'.");
+
+        using var resourceStream = resourceInfo.Stream;
+        using var bitmap = new Bitmap(resourceStream);
+
+        var width = bitmap.Width;
+        var height = bitmap.Height;
+        var iconHandle = bitmap.GetHicon();
+
+        try
+        {
+            var iconSource = Imaging.CreateBitmapSourceFromHIcon(
+                iconHandle,
+                Int32Rect.Empty,
+                BitmapSizeOptions.FromWidthAndHeight(width, height));
+
+            iconSource.Freeze();
+            return iconSource;
+        }
+        finally
+        {
+            NativeMethods.DestroyIcon(iconHandle);
+        }
+    }
+
+    private static class NativeMethods
+    {
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool DestroyIcon(IntPtr handle);
     }
 }

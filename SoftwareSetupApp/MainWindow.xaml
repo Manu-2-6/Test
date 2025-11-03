@@ -9,8 +9,7 @@
         mc:Ignorable="d"
         Title="Post-installation W11 Setup" Height="500" Width="680"
         MinWidth="620" MinHeight="420"
-        UseLayoutRounding="True"
-        Icon="/SoftwareSetupApp;component/Assets/Logos/icone_A.png">
+        UseLayoutRounding="True">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <converters:NameInitialConverter x:Key="NameInitialConverter" />
