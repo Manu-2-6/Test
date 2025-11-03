@@ -563,7 +563,7 @@ if ($target -ne [IntPtr]::Zero) {
         InitializeComponent();
         DataContext = this;
 
-        Icon = new BitmapImage(new Uri("pack://application:,,,/SoftwareSetupApp;component/Assets/Logos/Amix.png"));
+        Icon = new BitmapImage(new Uri("pack://application:,,,/SoftwareSetupApp;component/Assets/Logos/icone_A.png"));
 
         Loaded += (_, _) => PositionWindowOnRightHalf();
 
