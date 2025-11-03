@@ -5,6 +5,7 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>Assets\Logos\Icone_A.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ApplicationDefinition Update="App.xaml">
@@ -13,6 +14,14 @@
     <Page Update="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Remove="Assets\Logos\Icone_A.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\Logos\Icone_A.ico" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Include="Assets\Logos\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
