@@ -565,7 +565,7 @@ if ($target -ne [IntPtr]::Zero) {
         InitializeComponent();
         DataContext = this;
 
-        Icon = LoadHighQualityIcon("pack://application:,,,/SoftwareSetupApp;component/Assets/Logos/icone_A.png");
+        Icon = LoadHighQualityIcon();
 
         Loaded += (_, _) => PositionWindowOnRightHalf();
 
@@ -1579,25 +1579,37 @@ if ($target -ne [IntPtr]::Zero) {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-    private static ImageSource LoadHighQualityIcon(string resourcePath)
+    private static ImageSource LoadHighQualityIcon()
     {
-        var iconUri = new Uri(resourcePath, UriKind.Absolute);
-        var resourceInfo = Application.GetResourceStream(iconUri)
-                            ?? throw new InvalidOperationException($"Impossible de charger l'icône '{resourcePath}'.");
+        var iconFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Logos", "icone_A.png");
 
-        using var resourceStream = resourceInfo.Stream;
-        var decoder = BitmapDecoder.Create(
-            resourceStream,
-            BitmapCreateOptions.PreservePixelFormat,
-            BitmapCacheOption.OnLoad);
-
-        if (decoder.Frames.Count == 0)
+        if (File.Exists(iconFilePath))
         {
-            throw new InvalidOperationException($"Aucune frame trouvée pour l'icône '{resourcePath}'.");
+            return CreateFrozenBitmapImage(new Uri(iconFilePath, UriKind.Absolute));
         }
 
-        var iconFrame = decoder.Frames[0];
-        iconFrame.Freeze();
-        return iconFrame;
+        var packUri = new Uri("pack://application:,,,/SoftwareSetupApp;component/Assets/Logos/icone_A.png", UriKind.Absolute);
+
+        try
+        {
+            return CreateFrozenBitmapImage(packUri);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Impossible de charger l'icône 'icone_A.png'.", ex);
+        }
+    }
+
+    private static ImageSource CreateFrozenBitmapImage(Uri source)
+    {
+        var icon = new BitmapImage();
+        icon.BeginInit();
+        icon.UriSource = source;
+        icon.CacheOption = BitmapCacheOption.OnLoad;
+        icon.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
+        icon.EndInit();
+        icon.Freeze();
+        return icon;
     }
 }
