@@ -12,7 +12,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -30,17 +29,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private static readonly Regex BrokenUtf8GlyphRegex = new("â[\\u0080-\\u00FF]", RegexOptions.Compiled);
     private static readonly Regex UsefulContentRegex =
         new("[\\p{L}\\p{Nd}]+(?:[\\p{L}\\p{Nd}\\p{P}]*[\\p{L}\\p{Nd}]+)?", RegexOptions.Compiled);
-
-    private readonly WingetInstaller _installer = new();
-    private readonly WindowsConfigurationExecutor _configurationExecutor = new();
-    private readonly List<string> _logoDirectories;
-    private bool _isInstalling;
-    private CancellationTokenSource? _installationCts;
-    private string? _lastLogEntry;
-    private ScrollViewer? _logScrollViewer;
-    private bool _shouldAutoScroll = true;
-    private bool _isProfessionalMode;
-
     private const string WindowsUpdateScript = """
 # --- Ouvrir et placer la fenêtre Windows Update sur la moitié gauche de l'écran ---
 
@@ -319,7 +307,7 @@ if ($target -ne [IntPtr]::Zero) {
     # Calcule nouvelle position (gauche de l'écran)
     Add-Type -AssemblyName System.Windows.Forms
     $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-    $newX = [int]($wa.Width / 4 - $width / 4)  # centré visuellement dans la moitié gauche
+    $newX = [int]($wa.Width / 4 - $width / 4)
     $newY = [int]($wa.Top + ($wa.Height - $height) / 2)
 
     [NativeMove]::MoveWindow($target, $newX, $newY, $width, $height, $true) | Out-Null
@@ -396,7 +384,7 @@ if ($target -ne [IntPtr]::Zero) {
     # Calcule la position (moitié gauche)
     Add-Type -AssemblyName System.Windows.Forms
     $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-    $newX = [int]($wa.Width / 4 - $width / 4)  # centré horizontalement dans la moitié gauche
+    $newX = [int]($wa.Width / 4 - $width / 4)
     $newY = [int]($wa.Top + ($wa.Height - $height) / 2)
 
     [NativeMove]::MoveWindow($target, $newX, $newY, $width, $height, $true) | Out-Null
@@ -416,11 +404,24 @@ if ($target -ne [IntPtr]::Zero) {
         ("Optimiser les lecteurs", OptimizeDrivesScript)
     };
 
+
+    private readonly WingetInstaller _installer = new();
+    private readonly WindowsConfigurationExecutor _configurationExecutor = new();
+    private readonly List<string> _logoDirectories;
+    private bool _isInstalling;
+    private CancellationTokenSource? _installationCts;
+    private string? _lastLogEntry;
+    private ScrollViewer? _logScrollViewer;
+    private bool _shouldAutoScroll = true;
+    private bool _isProfessionalMode;
+    private bool? _areAllWindowsToolsSelected = true;
+
+
     public ObservableCollection<SoftwarePackage> Packages { get; } = new();
     public ObservableCollection<ConfigurationTask> ConfigurationTasks { get; } = new();
+    public ObservableCollection<ManualWindowsTool> ManualWindowsTools { get; } = new();
     public ObservableCollection<ManualTask> ManualTasks { get; } = new();
     public ObservableCollection<string> Logs { get; } = new();
-    public ObservableCollection<ManualWindowsTool> ManualWindowsTools { get; } = new();
 
     public bool IsInstalling
     {
@@ -435,38 +436,18 @@ if ($target -ne [IntPtr]::Zero) {
         }
     }
 
-    private void CancelButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (!IsInstalling || _installationCts == null)
-        {
-            return;
-        }
-
-        var confirmation = MessageBox.Show(
-            "Voulez-vous annuler l'installation en cours ?",
-            "Confirmation",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-
-        if (confirmation == MessageBoxResult.Yes)
-        {
-            CancelButton.IsEnabled = false;
-            _installationCts.Cancel();
-        }
-    }
-
-    private bool? _areAllWindowsToolsSelected = true;
-
     public bool? AreAllWindowsToolsSelected
     {
         get => _areAllWindowsToolsSelected;
         private set
         {
-            if (_areAllWindowsToolsSelected != value)
+            if (_areAllWindowsToolsSelected == value)
             {
-                _areAllWindowsToolsSelected = value;
-                OnPropertyChanged(nameof(AreAllWindowsToolsSelected));
+                return;
             }
+
+            _areAllWindowsToolsSelected = value;
+            OnPropertyChanged(nameof(AreAllWindowsToolsSelected));
         }
     }
 
@@ -474,6 +455,11 @@ if ($target -ne [IntPtr]::Zero) {
     {
         if (ManualWindowsTools.Count == 0)
         {
+            MessageBox.Show(
+                "Aucune fenêtre Windows n'est disponible.",
+                "Information",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
@@ -530,6 +516,26 @@ if ($target -ne [IntPtr]::Zero) {
         finally
         {
             OpenWindowsToolsButton.IsEnabled = true;
+        }
+    }
+
+    private void CancelButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!IsInstalling || _installationCts == null)
+        {
+            return;
+        }
+
+        var confirmation = MessageBox.Show(
+            "Voulez-vous annuler l'installation en cours ?",
+            "Confirmation",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (confirmation == MessageBoxResult.Yes)
+        {
+            CancelButton.IsEnabled = false;
+            _installationCts.Cancel();
         }
     }
 
@@ -1023,7 +1029,10 @@ if ($target -ne [IntPtr]::Zero) {
 
         await Task.WhenAll(process.WaitForExitAsync(), standardOutputTask, standardErrorTask);
 
-        return new PowerShellResult(process.ExitCode, standardOutputTask.Result, standardErrorTask.Result);
+        var standardOutput = await standardOutputTask;
+        var standardError = await standardErrorTask;
+
+        return new PowerShellResult(process.ExitCode, standardOutput, standardError);
     }
 
     private void AppendLogMessage(string message)
@@ -1540,47 +1549,12 @@ if ($target -ne [IntPtr]::Zero) {
         }
     }
 
+    private sealed record PowerShellResult(int ExitCode, string StandardOutput, string StandardError);
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private void OnPropertyChanged(string propertyName)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    private sealed record PowerShellResult(int ExitCode, string StandardOutput, string StandardError);
-
-    public sealed class ManualWindowsTool : INotifyPropertyChanged
-    {
-        private bool _isSelected = true;
-
-        public ManualWindowsTool(string name, string script)
-        {
-            Name = name;
-            Script = script;
-        }
-
-        public string Name { get; }
-
-        public string Script { get; }
-
-        public bool IsSelected
-        {
-            get => _isSelected;
-            set
-            {
-                if (_isSelected != value)
-                {
-                    _isSelected = value;
-                    OnPropertyChanged(nameof(IsSelected));
-                }
-            }
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        private void OnPropertyChanged(string propertyName)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
     }
 }

@@ -242,6 +242,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
+
                         <StackPanel Grid.Row="0"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Right"
@@ -269,8 +270,9 @@
                                    PlacementTarget="{Binding ElementName=WindowsToolsToggleButton}"
                                    Placement="Bottom"
                                    AllowsTransparency="True"
-                                   StaysOpen="True"
+                                   StaysOpen="False"
                                    PopupAnimation="Fade"
+                                   DataContext="{Binding DataContext, ElementName=OpenWindowsToolsButton}"
                                    Closed="WindowsToolsPopup_OnClosed">
                                 <Border Background="#FFFFFFFF"
                                         BorderBrush="#D0D6E2"
@@ -286,7 +288,7 @@
                                         <Separator Margin="0 0 0 8" />
                                         <ItemsControl ItemsSource="{Binding ManualWindowsTools}">
                                             <ItemsControl.ItemTemplate>
-                                                <DataTemplate DataType="{x:Type local:MainWindow+ManualWindowsTool}">
+                                                <DataTemplate DataType="{x:Type models:ManualWindowsTool}">
                                                     <CheckBox Content="{Binding Name}"
                                                               IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                                               Margin="0 4 0 0" />
@@ -297,6 +299,7 @@
                                 </Border>
                             </Popup>
                         </StackPanel>
+
                         <ListView x:Name="ManualTasksList"
                                   Grid.Row="1"
                                   ItemsSource="{Binding ManualTasks}"
