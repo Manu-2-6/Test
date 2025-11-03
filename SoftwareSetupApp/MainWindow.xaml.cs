@@ -415,6 +415,7 @@ if ($target -ne [IntPtr]::Zero) {
     private bool _shouldAutoScroll = true;
     private bool _isProfessionalMode;
     private bool? _areAllWindowsToolsSelected = true;
+    private bool _isUpdatingWindowsToolsSelection;
 
 
     public ObservableCollection<SoftwarePackage> Packages { get; } = new();
@@ -439,7 +440,7 @@ if ($target -ne [IntPtr]::Zero) {
     public bool? AreAllWindowsToolsSelected
     {
         get => _areAllWindowsToolsSelected;
-        private set
+        set
         {
             if (_areAllWindowsToolsSelected == value)
             {
@@ -448,6 +449,24 @@ if ($target -ne [IntPtr]::Zero) {
 
             _areAllWindowsToolsSelected = value;
             OnPropertyChanged(nameof(AreAllWindowsToolsSelected));
+
+            if (_isUpdatingWindowsToolsSelection || !value.HasValue)
+            {
+                return;
+            }
+
+            try
+            {
+                _isUpdatingWindowsToolsSelection = true;
+                foreach (var tool in ManualWindowsTools)
+                {
+                    tool.IsSelected = value.Value;
+                }
+            }
+            finally
+            {
+                _isUpdatingWindowsToolsSelection = false;
+            }
         }
     }
 
@@ -1381,12 +1400,6 @@ if ($target -ne [IntPtr]::Zero) {
         SetAllTasksSelection(shouldSelectAll);
     }
 
-    private void WindowsToolsSelectAllCheckBox_OnClick(object sender, RoutedEventArgs e)
-    {
-        var shouldSelectAll = ManualWindowsTools.Any(t => !t.IsSelected);
-        SetAllWindowsToolsSelection(shouldSelectAll);
-    }
-
     private void SetAllPackagesSelection(bool isSelected)
     {
         foreach (var package in Packages)
@@ -1401,16 +1414,6 @@ if ($target -ne [IntPtr]::Zero) {
         {
             task.IsSelected = isSelected;
         }
-    }
-
-    private void SetAllWindowsToolsSelection(bool isSelected)
-    {
-        foreach (var tool in ManualWindowsTools)
-        {
-            tool.IsSelected = isSelected;
-        }
-
-        UpdateWindowsToolsSelectAllState();
     }
 
     private void ApplyProfessionalModeToTasks()
@@ -1491,25 +1494,41 @@ if ($target -ne [IntPtr]::Zero) {
 
     private void UpdateWindowsToolsSelectAllState()
     {
-        if (ManualWindowsTools.Count == 0)
+        if (_isUpdatingWindowsToolsSelection)
         {
-            AreAllWindowsToolsSelected = false;
             return;
         }
 
-        var selectedCount = ManualWindowsTools.Count(tool => tool.IsSelected);
-        if (selectedCount == 0)
+        bool? newValue;
+
+        if (ManualWindowsTools.Count == 0)
         {
-            AreAllWindowsToolsSelected = false;
-        }
-        else if (selectedCount == ManualWindowsTools.Count)
-        {
-            AreAllWindowsToolsSelected = true;
+            newValue = false;
         }
         else
         {
-            AreAllWindowsToolsSelected = null;
+            var selectedCount = ManualWindowsTools.Count(tool => tool.IsSelected);
+            if (selectedCount == 0)
+            {
+                newValue = false;
+            }
+            else if (selectedCount == ManualWindowsTools.Count)
+            {
+                newValue = true;
+            }
+            else
+            {
+                newValue = null;
+            }
         }
+
+        if (_areAllWindowsToolsSelected == newValue)
+        {
+            return;
+        }
+
+        _areAllWindowsToolsSelected = newValue;
+        OnPropertyChanged(nameof(AreAllWindowsToolsSelected));
     }
 
     private void WindowsToolsToggleButton_OnChecked(object sender, RoutedEventArgs e)
