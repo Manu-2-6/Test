@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -1587,32 +1586,18 @@ if ($target -ne [IntPtr]::Zero) {
                             ?? throw new InvalidOperationException($"Impossible de charger l'icône '{resourcePath}'.");
 
         using var resourceStream = resourceInfo.Stream;
-        using var bitmap = new Bitmap(resourceStream);
+        var decoder = BitmapDecoder.Create(
+            resourceStream,
+            BitmapCreateOptions.PreservePixelFormat,
+            BitmapCacheOption.OnLoad);
 
-        var width = bitmap.Width;
-        var height = bitmap.Height;
-        var iconHandle = bitmap.GetHicon();
-
-        try
+        if (decoder.Frames.Count == 0)
         {
-            var iconSource = Imaging.CreateBitmapSourceFromHIcon(
-                iconHandle,
-                Int32Rect.Empty,
-                BitmapSizeOptions.FromWidthAndHeight(width, height));
-
-            iconSource.Freeze();
-            return iconSource;
+            throw new InvalidOperationException($"Aucune frame trouvée pour l'icône '{resourcePath}'.");
         }
-        finally
-        {
-            NativeMethods.DestroyIcon(iconHandle);
-        }
-    }
 
-    private static class NativeMethods
-    {
-        [DllImport("user32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool DestroyIcon(IntPtr handle);
+        var iconFrame = decoder.Frames[0];
+        iconFrame.Freeze();
+        return iconFrame;
     }
 }
