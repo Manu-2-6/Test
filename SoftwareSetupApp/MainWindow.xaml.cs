@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -28,6 +29,381 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private static readonly Regex BrokenUtf8GlyphRegex = new("â[\\u0080-\\u00FF]", RegexOptions.Compiled);
     private static readonly Regex UsefulContentRegex =
         new("[\\p{L}\\p{Nd}]+(?:[\\p{L}\\p{Nd}\\p{P}]*[\\p{L}\\p{Nd}]+)?", RegexOptions.Compiled);
+    private const string WindowsUpdateScript = """
+# --- Ouvrir et placer la fenêtre Windows Update sur la moitié gauche de l'écran ---
+
+# 1) Ouvre la page Paramètres → Windows Update
+Start-Process "ms-settings:windowsupdate" | Out-Null
+
+# 2) Patiente pour laisser la fenêtre s’afficher
+Start-Sleep -Seconds 2
+
+# 3) Déclare les API Win32
+Add-Type @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+public static class Win32 {
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern int  GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+    [DllImport("user32.dll")] public static extern int  GetClassName(IntPtr hWnd, StringBuilder text, int count);
+    [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    public static readonly IntPtr HWND_TOP = IntPtr.Zero;
+    public const uint SWP_NOZORDER = 0x0004;
+    public const uint SWP_NOOWNERZORDER = 0x0200;
+    public const uint SWP_SHOWWINDOW = 0x0040;
+    public const int  SW_RESTORE = 9;
+}
+"@
+
+# 4) Recherche la fenêtre des Paramètres
+$target = [IntPtr]::Zero
+[Win32+EnumWindowsProc]$enum = {
+    param([IntPtr]$hWnd, [IntPtr]$lParam)
+    if (-not [Win32]::IsWindowVisible($hWnd)) { return $true }
+    $cls = New-Object System.Text.StringBuilder 256
+    [Win32]::GetClassName($hWnd, $cls, $cls.Capacity) | Out-Null
+    if ($cls.ToString() -ne "ApplicationFrameWindow") { return $true }
+
+    $txt = New-Object System.Text.StringBuilder 512
+    [Win32]::GetWindowText($hWnd, $txt, $txt.Capacity) | Out-Null
+    $title = $txt.ToString()
+    if ($title -like "*Paramètres*" -or $title -like "*Settings*") {
+        $script:target = $hWnd
+        return $false
+    }
+    return $true
+}
+
+# Essaie plusieurs fois pour laisser le temps à la fenêtre
+for ($i=0; $i -lt 15 -and $target -eq [IntPtr]::Zero; $i++) {
+    [Win32]::EnumWindows($enum, [IntPtr]::Zero) | Out-Null
+    if ($target -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 300 }
+}
+
+if ($target -ne [IntPtr]::Zero) {
+    # 5) Calcule la moitié gauche de l’écran
+    Add-Type -AssemblyName System.Windows.Forms
+    $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+
+    $left   = 0
+    $top    = 0
+    $width  = [int]([math]::Floor($wa.Width / 2))
+    $height = $wa.Height
+
+    # 6) Restaure et positionne la fenêtre
+    [Win32]::ShowWindow($target, [Win32]::SW_RESTORE) | Out-Null
+    [Win32]::SetForegroundWindow($target) | Out-Null
+    [Win32]::SetWindowPos($target, [Win32]::HWND_TOP, $left, $top, $width, $height,
+        [Win32]::SWP_NOZORDER -bor [Win32]::SWP_NOOWNERZORDER -bor [Win32]::SWP_SHOWWINDOW) | Out-Null
+} else {
+    Write-Warning "Impossible de localiser la fenêtre des Paramètres Windows Update."
+}
+""";
+
+    private const string DeviceManagerScript = """
+# --- Ouvrir et placer le Gestionnaire de périphériques sur la moitié gauche ---
+
+# 1) Ouvre le Gestionnaire de périphériques et récupère le process (MMC)
+$proc = Start-Process "devmgmt.msc" -PassThru
+
+# 2) Attends que la fenêtre soit créée
+$hWnd = [IntPtr]::Zero
+for ($i=0; $i -lt 80 -and $hWnd -eq [IntPtr]::Zero; $i++) {
+    $proc.Refresh()
+    if ($proc.MainWindowHandle -ne 0) { $hWnd = [IntPtr]$proc.MainWindowHandle; break }
+    Start-Sleep -Milliseconds 200
+}
+if ($hWnd -eq [IntPtr]::Zero) { Write-Warning "Impossible de trouver la fenêtre du Gestionnaire de périphériques."; return }
+
+# 3) API Win32 pour (re)positionner la fenêtre
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class Win32 {
+    [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    public static readonly IntPtr HWND_TOP = IntPtr.Zero;
+    public const uint SWP_NOZORDER = 0x0004;
+    public const uint SWP_NOOWNERZORDER = 0x0200;
+    public const uint SWP_SHOWWINDOW = 0x0040;
+    public const int  SW_RESTORE = 9;
+}
+"@
+
+# 4) Utilise la zone de travail (sans barre des tâches) et place à gauche
+Add-Type -AssemblyName System.Windows.Forms
+$wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+$left   = 0
+$top    = 0
+$width  = [int]([math]::Floor($wa.Width / 2))
+$height = $wa.Height
+
+[Win32]::ShowWindow($hWnd, [Win32]::SW_RESTORE) | Out-Null
+[Win32]::SetForegroundWindow($hWnd) | Out-Null
+[Win32]::SetWindowPos($hWnd, [Win32]::HWND_TOP, $left, $top, $width, $height,
+    [Win32]::SWP_NOZORDER -bor [Win32]::SWP_NOOWNERZORDER -bor [Win32]::SWP_SHOWWINDOW) | Out-Null
+""";
+
+    private const string PowerOptionsScript = """
+powercfg.cpl
+""";
+
+    private const string DesktopIconsScript = """
+Start-Process "rundll32.exe" "shell32.dll,Control_RunDLL desk.cpl,,0"
+""";
+
+    private const string MicrosoftStoreScript = """
+# --- Ouvrir/positionner le Microsoft Store sur la moitié gauche (sans Snap Assist) ---
+
+# 1) Ouvre le Microsoft Store si besoin
+Start-Process "ms-windows-store:" | Out-Null
+
+# 2) Laisse le temps à la fenêtre d'apparaître
+Start-Sleep -Seconds 2
+
+# 3) Déclare les API Win32 nécessaires
+Add-Type @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+
+public static class Win32 {
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern int  GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+    [DllImport("user32.dll")] public static extern int  GetClassName(IntPtr hWnd, StringBuilder text, int count);
+    [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    public static readonly IntPtr HWND_TOP = IntPtr.Zero;
+    public const uint SWP_NOZORDER = 0x0004;
+    public const uint SWP_NOOWNERZORDER = 0x0200;
+    public const uint SWP_SHOWWINDOW = 0x0040;
+    public const int  SW_RESTORE = 9;
+}
+"@
+
+# 4) Cherche la vraie fenêtre UWP (classe ApplicationFrameWindow)
+$target = [IntPtr]::Zero
+[Win32+EnumWindowsProc]$enum = {
+    param([IntPtr]$hWnd, [IntPtr]$lParam)
+    if (-not [Win32]::IsWindowVisible($hWnd)) { return $true }
+    $cls = New-Object System.Text.StringBuilder 256
+    [Win32]::GetClassName($hWnd, $cls, $cls.Capacity) | Out-Null
+    if ($cls.ToString() -ne "ApplicationFrameWindow") { return $true }
+
+    $txt = New-Object System.Text.StringBuilder 512
+    [Win32]::GetWindowText($hWnd, $txt, $txt.Capacity) | Out-Null
+    $title = $txt.ToString()
+    if ($title -like "*Microsoft Store*") {
+        $script:target = $hWnd
+        return $false  # stop enumeration
+    }
+    return $true
+}
+
+# Essaie plusieurs fois au cas où le Store met un peu plus de temps
+for ($i=0; $i -lt 15 -and $target -eq [IntPtr]::Zero; $i++) {
+    [Win32]::EnumWindows($enum, [IntPtr]::Zero) | Out-Null
+    if ($target -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 250 }
+}
+
+if ($target -ne [IntPtr]::Zero) {
+    # 5) Utilise la zone de travail (sans la barre des tâches) du moniteur principal
+    Add-Type -AssemblyName System.Windows.Forms
+    $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+
+    $left   = 0
+    $top    = 0
+    $width  = [int]([math]::Floor($wa.Width / 2))
+    $height = $wa.Height
+
+    # 6) Restaure (si maximisée) + place exactement sur la moitié gauche
+    [Win32]::ShowWindow($target, [Win32]::SW_RESTORE) | Out-Null
+    [Win32]::SetForegroundWindow($target) | Out-Null
+    [Win32]::SetWindowPos($target, [Win32]::HWND_TOP, $left, $top, $width, $height,
+        [Win32]::SWP_NOZORDER -bor [Win32]::SWP_NOOWNERZORDER -bor [Win32]::SWP_SHOWWINDOW) | Out-Null
+} else {
+    Write-Warning "Impossible de localiser la fenêtre du Microsoft Store."
+}
+""";
+
+    private const string CleanmgrScript = """
+# --- Ouvre "Nettoyage de disque" et le déplace sur la moitié gauche de l'écran ---
+
+# 1) Lance cleanmgr
+$proc = Start-Process "cleanmgr.exe" -PassThru
+Start-Sleep -Seconds 2  # laisse le temps à la fenêtre d'apparaitre
+
+# 2) API Win32 pour trouver et déplacer la fenêtre
+Add-Type @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+public static class NativeMove {
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+    [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+
+    public const int SW_RESTORE = 9;
+}
+public struct RECT {
+    public int Left;
+    public int Top;
+    public int Right;
+    public int Bottom;
+}
+"@
+
+# 3) Recherche la fenêtre cleanmgr
+$target = [IntPtr]::Zero
+$wantPid = [uint32]$proc.Id
+
+[NativeMove+EnumWindowsProc]$enum = {
+    param([IntPtr]$hWnd, [IntPtr]$lParam)
+    if (-not [NativeMove]::IsWindowVisible($hWnd)) { return $true }
+
+    [uint32]$windowPid = 0
+    [NativeMove]::GetWindowThreadProcessId($hWnd, [ref]$windowPid) | Out-Null
+    if ($windowPid -ne [uint32]$lParam.ToInt64()) { return $true }
+
+    $script:target = $hWnd
+    return $false
+}
+
+# Essaie plusieurs fois au cas où la fenêtre tarde
+for ($i=0; $i -lt 30 -and $target -eq [IntPtr]::Zero; $i++) {
+    [NativeMove]::EnumWindows($enum, [IntPtr]::new($wantPid)) | Out-Null
+    if ($target -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 300 }
+}
+
+# 4) Si trouvée, déplace sans changer la taille
+if ($target -ne [IntPtr]::Zero) {
+    [NativeMove]::ShowWindow($target, [NativeMove]::SW_RESTORE) | Out-Null
+    [NativeMove]::SetForegroundWindow($target) | Out-Null
+
+    # Récupère la taille actuelle
+    $rect = New-Object RECT
+    [NativeMove]::GetWindowRect($target, [ref]$rect) | Out-Null
+    $width = $rect.Right - $rect.Left
+    $height = $rect.Bottom - $rect.Top
+
+    # Calcule nouvelle position (gauche de l'écran)
+    Add-Type -AssemblyName System.Windows.Forms
+    $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $newX = [int]($wa.Width / 4 - $width / 4)
+    $newY = [int]($wa.Top + ($wa.Height - $height) / 2)
+
+    [NativeMove]::MoveWindow($target, $newX, $newY, $width, $height, $true) | Out-Null
+} else {
+    Write-Warning "Impossible de localiser la fenêtre du Nettoyage de disque."
+}
+""";
+
+    private const string OptimizeDrivesScript = """
+# --- Ouvre "Optimiser les lecteurs" (dfrgui.exe) et le déplace sur la moitié gauche de l'écran ---
+
+# 1) Lance dfrgui et récupère le processus
+$proc = Start-Process "dfrgui.exe" -PassThru
+Start-Sleep -Seconds 2  # laisse le temps à la fenêtre d'apparaitre
+
+# 2) API Win32 (mêmes fonctions que pour cleanmgr)
+Add-Type @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+public static class NativeMove {
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+    [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+
+    public const int SW_RESTORE = 9;
+}
+public struct RECT {
+    public int Left;
+    public int Top;
+    public int Right;
+    public int Bottom;
+}
+"@
+
+# 3) Trouve la fenêtre principale de dfrgui
+$target = [IntPtr]::Zero
+$wantPid = [uint32]$proc.Id
+
+[NativeMove+EnumWindowsProc]$enum = {
+    param([IntPtr]$hWnd, [IntPtr]$lParam)
+    if (-not [NativeMove]::IsWindowVisible($hWnd)) { return $true }
+
+    [uint32]$windowPid = 0
+    [NativeMove]::GetWindowThreadProcessId($hWnd, [ref]$windowPid) | Out-Null
+    if ($windowPid -ne [uint32]$lParam.ToInt64()) { return $true }
+
+    $script:target = $hWnd
+    return $false
+}
+
+# 4) Attend que la fenêtre soit détectée
+for ($i=0; $i -lt 30 -and $target -eq [IntPtr]::Zero; $i++) {
+    [NativeMove]::EnumWindows($enum, [IntPtr]::new($wantPid)) | Out-Null
+    if ($target -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 300 }
+}
+
+# 5) Si trouvée, déplace sans redimensionner
+if ($target -ne [IntPtr]::Zero) {
+    [NativeMove]::ShowWindow($target, [NativeMove]::SW_RESTORE) | Out-Null
+    [NativeMove]::SetForegroundWindow($target) | Out-Null
+
+    # Taille actuelle de la fenêtre
+    $rect = New-Object RECT
+    [NativeMove]::GetWindowRect($target, [ref]$rect) | Out-Null
+    $width = $rect.Right - $rect.Left
+    $height = $rect.Bottom - $rect.Top
+
+    # Calcule la position (moitié gauche)
+    Add-Type -AssemblyName System.Windows.Forms
+    $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $newX = [int]($wa.Width / 4 - $width / 4)
+    $newY = [int]($wa.Top + ($wa.Height - $height) / 2)
+
+    [NativeMove]::MoveWindow($target, $newX, $newY, $width, $height, $true) | Out-Null
+} else {
+    Write-Warning "Impossible de localiser la fenêtre 'Optimiser les lecteurs'."
+}
+""";
+
+    private static readonly (string Name, string Script)[] ManualWindowsToolDefinitions =
+    {
+        ("Windows Update", WindowsUpdateScript),
+        ("Gestionnaire de périphériques", DeviceManagerScript),
+        ("Options d'alimentation", PowerOptionsScript),
+        ("Paramètres des icônes du Bureau", DesktopIconsScript),
+        ("Microsoft Store", MicrosoftStoreScript),
+        ("Nettoyage de disque", CleanmgrScript),
+        ("Optimiser les lecteurs", OptimizeDrivesScript)
+    };
+
 
     private readonly WingetInstaller _installer = new();
     private readonly WindowsConfigurationExecutor _configurationExecutor = new();
@@ -38,9 +414,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private ScrollViewer? _logScrollViewer;
     private bool _shouldAutoScroll = true;
     private bool _isProfessionalMode;
+    private bool? _areAllWindowsToolsSelected = true;
+    private bool _isUpdatingWindowsToolsSelection;
+
 
     public ObservableCollection<SoftwarePackage> Packages { get; } = new();
     public ObservableCollection<ConfigurationTask> ConfigurationTasks { get; } = new();
+    public ObservableCollection<ManualWindowsTool> ManualWindowsTools { get; } = new();
     public ObservableCollection<ManualTask> ManualTasks { get; } = new();
     public ObservableCollection<string> Logs { get; } = new();
 
@@ -54,6 +434,107 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 _isInstalling = value;
                 OnPropertyChanged(nameof(IsInstalling));
             }
+        }
+    }
+
+    public bool? AreAllWindowsToolsSelected
+    {
+        get => _areAllWindowsToolsSelected;
+        set
+        {
+            if (_areAllWindowsToolsSelected == value)
+            {
+                return;
+            }
+
+            _areAllWindowsToolsSelected = value;
+            OnPropertyChanged(nameof(AreAllWindowsToolsSelected));
+
+            if (_isUpdatingWindowsToolsSelection || !value.HasValue)
+            {
+                return;
+            }
+
+            try
+            {
+                _isUpdatingWindowsToolsSelection = true;
+                foreach (var tool in ManualWindowsTools)
+                {
+                    tool.IsSelected = value.Value;
+                }
+            }
+            finally
+            {
+                _isUpdatingWindowsToolsSelection = false;
+            }
+        }
+    }
+
+    private async void OpenWindowsToolsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ManualWindowsTools.Count == 0)
+        {
+            MessageBox.Show(
+                "Aucune fenêtre Windows n'est disponible.",
+                "Information",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        CloseWindowsToolsPopup();
+
+        var selectedTools = ManualWindowsTools.Where(tool => tool.IsSelected).ToList();
+        if (selectedTools.Count == 0)
+        {
+            AppendLogMessage("[Tâches manuelles] Aucune fenêtre Windows sélectionnée.");
+            MessageBox.Show(
+                "Veuillez sélectionner au moins une fenêtre à ouvrir.",
+                "Aucune fenêtre sélectionnée",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        OpenWindowsToolsButton.IsEnabled = false;
+
+        try
+        {
+            foreach (var tool in selectedTools)
+            {
+                AppendLogMessage($"[Tâches manuelles] Ouverture de {tool.Name}...");
+
+                var result = await RunPowerShellScriptAsync(tool.Script);
+                if (result.ExitCode != 0)
+                {
+                    var errorDetails = string.IsNullOrWhiteSpace(result.StandardError)
+                        ? $"Code de sortie : {result.ExitCode}"
+                        : result.StandardError.Trim();
+                    throw new InvalidOperationException($"{tool.Name} a échoué ({errorDetails}).");
+                }
+
+                if (!string.IsNullOrWhiteSpace(result.StandardError))
+                {
+                    AppendLogMessage($"[Tâches manuelles] {tool.Name} (messages PowerShell) : {result.StandardError.Trim()}");
+                }
+
+                AppendLogMessage($"[Tâches manuelles] {tool.Name} ouvert.");
+            }
+
+            AppendLogMessage("[Tâches manuelles] Fenêtres d'assistance ouvertes.");
+        }
+        catch (Exception ex)
+        {
+            AppendLogMessage($"[Tâches manuelles] Échec lors de l'ouverture des fenêtres : {ex.Message}");
+            MessageBox.Show(
+                $"Une erreur s'est produite lors de l'ouverture des fenêtres : {ex.Message}",
+                "Erreur",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            OpenWindowsToolsButton.IsEnabled = true;
         }
     }
 
@@ -159,6 +640,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             task.PropertyChanged += TaskOnPropertyChanged;
         }
+
+        foreach (var (name, script) in ManualWindowsToolDefinitions)
+        {
+            var tool = new ManualWindowsTool(name, script);
+            tool.PropertyChanged += ManualWindowsToolOnPropertyChanged;
+            ManualWindowsTools.Add(tool);
+        }
+
+        UpdateWindowsToolsSelectAllState();
 
         ManualTasks.Add(new ManualTask("Modifier les paramètres d’alimentation avancés : Paramètres de la carte graphique (Intel Settings ou autres) : Performance max."));
         ManualTasks.Add(new ManualTask("Win + X / gestionnaire de périphérique – Pointer les pilotes manquants."));
@@ -527,6 +1017,41 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             smoother?.Dispose();
         }
+    }
+
+    private static async Task<PowerShellResult> RunPowerShellScriptAsync(string script)
+    {
+        if (string.IsNullOrWhiteSpace(script))
+        {
+            return new PowerShellResult(0, string.Empty, string.Empty);
+        }
+
+        var encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            }
+        };
+
+        process.Start();
+
+        var standardOutputTask = process.StandardOutput.ReadToEndAsync();
+        var standardErrorTask = process.StandardError.ReadToEndAsync();
+
+        await Task.WhenAll(process.WaitForExitAsync(), standardOutputTask, standardErrorTask);
+
+        var standardOutput = await standardOutputTask;
+        var standardError = await standardErrorTask;
+
+        return new PowerShellResult(process.ExitCode, standardOutput, standardError);
     }
 
     private void AppendLogMessage(string message)
@@ -915,6 +1440,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
+    private void ManualWindowsToolOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ManualWindowsTool.IsSelected))
+        {
+            UpdateWindowsToolsSelectAllState();
+        }
+    }
+
     private void UpdateProgramsSelectAllState()
     {
         if (ProgramsSelectAllCheckBox == null)
@@ -958,6 +1491,84 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             TasksSelectAllCheckBox.IsChecked = null;
         }
     }
+
+    private void UpdateWindowsToolsSelectAllState()
+    {
+        if (_isUpdatingWindowsToolsSelection)
+        {
+            return;
+        }
+
+        bool? newValue;
+
+        if (ManualWindowsTools.Count == 0)
+        {
+            newValue = false;
+        }
+        else
+        {
+            var selectedCount = ManualWindowsTools.Count(tool => tool.IsSelected);
+            if (selectedCount == 0)
+            {
+                newValue = false;
+            }
+            else if (selectedCount == ManualWindowsTools.Count)
+            {
+                newValue = true;
+            }
+            else
+            {
+                newValue = null;
+            }
+        }
+
+        if (_areAllWindowsToolsSelected == newValue)
+        {
+            return;
+        }
+
+        _areAllWindowsToolsSelected = newValue;
+        OnPropertyChanged(nameof(AreAllWindowsToolsSelected));
+    }
+
+    private void WindowsToolsToggleButton_OnChecked(object sender, RoutedEventArgs e)
+    {
+        if (WindowsToolsPopup != null)
+        {
+            WindowsToolsPopup.IsOpen = true;
+        }
+    }
+
+    private void WindowsToolsToggleButton_OnUnchecked(object sender, RoutedEventArgs e)
+    {
+        if (WindowsToolsPopup != null)
+        {
+            WindowsToolsPopup.IsOpen = false;
+        }
+    }
+
+    private void WindowsToolsPopup_OnClosed(object? sender, EventArgs e)
+    {
+        if (WindowsToolsToggleButton != null)
+        {
+            WindowsToolsToggleButton.IsChecked = false;
+        }
+    }
+
+    private void CloseWindowsToolsPopup()
+    {
+        if (WindowsToolsPopup != null)
+        {
+            WindowsToolsPopup.IsOpen = false;
+        }
+
+        if (WindowsToolsToggleButton != null)
+        {
+            WindowsToolsToggleButton.IsChecked = false;
+        }
+    }
+
+    private sealed record PowerShellResult(int ExitCode, string StandardOutput, string StandardError);
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
