@@ -246,10 +246,56 @@
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Right"
                                     Margin="0 0 0 8">
-                            <Button x:Name="OpenWindowsToolsButton"
-                                    Content="Ouvrir les fenêtres Windows"
-                                    Padding="12 6"
-                                    Click="OpenWindowsToolsButton_Click" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="OpenWindowsToolsButton"
+                                        Grid.Column="0"
+                                        Content="Ouvrir les fenêtres Windows"
+                                        Padding="12 6"
+                                        Click="OpenWindowsToolsButton_Click" />
+                                <ToggleButton x:Name="WindowsToolsToggleButton"
+                                              Grid.Column="1"
+                                              Width="32"
+                                              Margin="6 0 0 0"
+                                              Content="▼"
+                                              ClickMode="Press"
+                                              Checked="WindowsToolsToggleButton_OnChecked"
+                                              Unchecked="WindowsToolsToggleButton_OnUnchecked" />
+                            </Grid>
+                            <Popup x:Name="WindowsToolsPopup"
+                                   PlacementTarget="{Binding ElementName=WindowsToolsToggleButton}"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   StaysOpen="True"
+                                   PopupAnimation="Fade"
+                                   Closed="WindowsToolsPopup_OnClosed">
+                                <Border Background="#FFFFFFFF"
+                                        BorderBrush="#D0D6E2"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12">
+                                    <StackPanel>
+                                        <CheckBox Content="Tout sélectionner"
+                                                  Margin="0 0 0 8"
+                                                  IsThreeState="True"
+                                                  IsChecked="{Binding AreAllWindowsToolsSelected}"
+                                                  Click="WindowsToolsSelectAllCheckBox_OnClick" />
+                                        <Separator Margin="0 0 0 8" />
+                                        <ItemsControl ItemsSource="{Binding ManualWindowsTools}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type local:MainWindow+ManualWindowsTool}">
+                                                    <CheckBox Content="{Binding Name}"
+                                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                              Margin="0 4 0 0" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
                         </StackPanel>
                         <ListView x:Name="ManualTasksList"
                                   Grid.Row="1"

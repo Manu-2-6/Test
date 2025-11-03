@@ -12,6 +12,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -250,19 +251,176 @@ if ($target -ne [IntPtr]::Zero) {
 }
 """;
 
-    private static readonly (string Name, string Script)[] ManualWindowsScripts =
+    private const string CleanmgrScript = """
+# --- Ouvre "Nettoyage de disque" et le déplace sur la moitié gauche de l'écran ---
+
+# 1) Lance cleanmgr
+$proc = Start-Process "cleanmgr.exe" -PassThru
+Start-Sleep -Seconds 2  # laisse le temps à la fenêtre d'apparaitre
+
+# 2) API Win32 pour trouver et déplacer la fenêtre
+Add-Type @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+public static class NativeMove {
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+    [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+
+    public const int SW_RESTORE = 9;
+}
+public struct RECT {
+    public int Left;
+    public int Top;
+    public int Right;
+    public int Bottom;
+}
+"@
+
+# 3) Recherche la fenêtre cleanmgr
+$target = [IntPtr]::Zero
+$wantPid = [uint32]$proc.Id
+
+[NativeMove+EnumWindowsProc]$enum = {
+    param([IntPtr]$hWnd, [IntPtr]$lParam)
+    if (-not [NativeMove]::IsWindowVisible($hWnd)) { return $true }
+
+    [uint32]$windowPid = 0
+    [NativeMove]::GetWindowThreadProcessId($hWnd, [ref]$windowPid) | Out-Null
+    if ($windowPid -ne [uint32]$lParam.ToInt64()) { return $true }
+
+    $script:target = $hWnd
+    return $false
+}
+
+# Essaie plusieurs fois au cas où la fenêtre tarde
+for ($i=0; $i -lt 30 -and $target -eq [IntPtr]::Zero; $i++) {
+    [NativeMove]::EnumWindows($enum, [IntPtr]::new($wantPid)) | Out-Null
+    if ($target -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 300 }
+}
+
+# 4) Si trouvée, déplace sans changer la taille
+if ($target -ne [IntPtr]::Zero) {
+    [NativeMove]::ShowWindow($target, [NativeMove]::SW_RESTORE) | Out-Null
+    [NativeMove]::SetForegroundWindow($target) | Out-Null
+
+    # Récupère la taille actuelle
+    $rect = New-Object RECT
+    [NativeMove]::GetWindowRect($target, [ref]$rect) | Out-Null
+    $width = $rect.Right - $rect.Left
+    $height = $rect.Bottom - $rect.Top
+
+    # Calcule nouvelle position (gauche de l'écran)
+    Add-Type -AssemblyName System.Windows.Forms
+    $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $newX = [int]($wa.Width / 4 - $width / 4)  # centré visuellement dans la moitié gauche
+    $newY = [int]($wa.Top + ($wa.Height - $height) / 2)
+
+    [NativeMove]::MoveWindow($target, $newX, $newY, $width, $height, $true) | Out-Null
+} else {
+    Write-Warning "Impossible de localiser la fenêtre du Nettoyage de disque."
+}
+""";
+
+    private const string OptimizeDrivesScript = """
+# --- Ouvre "Optimiser les lecteurs" (dfrgui.exe) et le déplace sur la moitié gauche de l'écran ---
+
+# 1) Lance dfrgui et récupère le processus
+$proc = Start-Process "dfrgui.exe" -PassThru
+Start-Sleep -Seconds 2  # laisse le temps à la fenêtre d'apparaitre
+
+# 2) API Win32 (mêmes fonctions que pour cleanmgr)
+Add-Type @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+public static class NativeMove {
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+    [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+
+    public const int SW_RESTORE = 9;
+}
+public struct RECT {
+    public int Left;
+    public int Top;
+    public int Right;
+    public int Bottom;
+}
+"@
+
+# 3) Trouve la fenêtre principale de dfrgui
+$target = [IntPtr]::Zero
+$wantPid = [uint32]$proc.Id
+
+[NativeMove+EnumWindowsProc]$enum = {
+    param([IntPtr]$hWnd, [IntPtr]$lParam)
+    if (-not [NativeMove]::IsWindowVisible($hWnd)) { return $true }
+
+    [uint32]$windowPid = 0
+    [NativeMove]::GetWindowThreadProcessId($hWnd, [ref]$windowPid) | Out-Null
+    if ($windowPid -ne [uint32]$lParam.ToInt64()) { return $true }
+
+    $script:target = $hWnd
+    return $false
+}
+
+# 4) Attend que la fenêtre soit détectée
+for ($i=0; $i -lt 30 -and $target -eq [IntPtr]::Zero; $i++) {
+    [NativeMove]::EnumWindows($enum, [IntPtr]::new($wantPid)) | Out-Null
+    if ($target -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 300 }
+}
+
+# 5) Si trouvée, déplace sans redimensionner
+if ($target -ne [IntPtr]::Zero) {
+    [NativeMove]::ShowWindow($target, [NativeMove]::SW_RESTORE) | Out-Null
+    [NativeMove]::SetForegroundWindow($target) | Out-Null
+
+    # Taille actuelle de la fenêtre
+    $rect = New-Object RECT
+    [NativeMove]::GetWindowRect($target, [ref]$rect) | Out-Null
+    $width = $rect.Right - $rect.Left
+    $height = $rect.Bottom - $rect.Top
+
+    # Calcule la position (moitié gauche)
+    Add-Type -AssemblyName System.Windows.Forms
+    $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $newX = [int]($wa.Width / 4 - $width / 4)  # centré horizontalement dans la moitié gauche
+    $newY = [int]($wa.Top + ($wa.Height - $height) / 2)
+
+    [NativeMove]::MoveWindow($target, $newX, $newY, $width, $height, $true) | Out-Null
+} else {
+    Write-Warning "Impossible de localiser la fenêtre 'Optimiser les lecteurs'."
+}
+""";
+
+    private static readonly (string Name, string Script)[] ManualWindowsToolDefinitions =
     {
         ("Windows Update", WindowsUpdateScript),
         ("Gestionnaire de périphériques", DeviceManagerScript),
         ("Options d'alimentation", PowerOptionsScript),
         ("Paramètres des icônes du Bureau", DesktopIconsScript),
-        ("Microsoft Store", MicrosoftStoreScript)
+        ("Microsoft Store", MicrosoftStoreScript),
+        ("Nettoyage de disque", CleanmgrScript),
+        ("Optimiser les lecteurs", OptimizeDrivesScript)
     };
 
     public ObservableCollection<SoftwarePackage> Packages { get; } = new();
     public ObservableCollection<ConfigurationTask> ConfigurationTasks { get; } = new();
     public ObservableCollection<ManualTask> ManualTasks { get; } = new();
     public ObservableCollection<string> Logs { get; } = new();
+    public ObservableCollection<ManualWindowsTool> ManualWindowsTools { get; } = new();
 
     public bool IsInstalling
     {
@@ -297,10 +455,39 @@ if ($target -ne [IntPtr]::Zero) {
         }
     }
 
+    private bool? _areAllWindowsToolsSelected = true;
+
+    public bool? AreAllWindowsToolsSelected
+    {
+        get => _areAllWindowsToolsSelected;
+        private set
+        {
+            if (_areAllWindowsToolsSelected != value)
+            {
+                _areAllWindowsToolsSelected = value;
+                OnPropertyChanged(nameof(AreAllWindowsToolsSelected));
+            }
+        }
+    }
+
     private async void OpenWindowsToolsButton_Click(object sender, RoutedEventArgs e)
     {
-        if (ManualWindowsScripts.Length == 0)
+        if (ManualWindowsTools.Count == 0)
         {
+            return;
+        }
+
+        CloseWindowsToolsPopup();
+
+        var selectedTools = ManualWindowsTools.Where(tool => tool.IsSelected).ToList();
+        if (selectedTools.Count == 0)
+        {
+            AppendLogMessage("[Tâches manuelles] Aucune fenêtre Windows sélectionnée.");
+            MessageBox.Show(
+                "Veuillez sélectionner au moins une fenêtre à ouvrir.",
+                "Aucune fenêtre sélectionnée",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
@@ -308,25 +495,25 @@ if ($target -ne [IntPtr]::Zero) {
 
         try
         {
-            foreach (var (name, script) in ManualWindowsScripts)
+            foreach (var tool in selectedTools)
             {
-                AppendLogMessage($"[Tâches manuelles] Ouverture de {name}...");
+                AppendLogMessage($"[Tâches manuelles] Ouverture de {tool.Name}...");
 
-                var result = await RunPowerShellScriptAsync(script);
+                var result = await RunPowerShellScriptAsync(tool.Script);
                 if (result.ExitCode != 0)
                 {
                     var errorDetails = string.IsNullOrWhiteSpace(result.StandardError)
                         ? $"Code de sortie : {result.ExitCode}"
                         : result.StandardError.Trim();
-                    throw new InvalidOperationException($"{name} a échoué ({errorDetails}).");
+                    throw new InvalidOperationException($"{tool.Name} a échoué ({errorDetails}).");
                 }
 
                 if (!string.IsNullOrWhiteSpace(result.StandardError))
                 {
-                    AppendLogMessage($"[Tâches manuelles] {name} (messages PowerShell) : {result.StandardError.Trim()}");
+                    AppendLogMessage($"[Tâches manuelles] {tool.Name} (messages PowerShell) : {result.StandardError.Trim()}");
                 }
 
-                AppendLogMessage($"[Tâches manuelles] {name} ouvert.");
+                AppendLogMessage($"[Tâches manuelles] {tool.Name} ouvert.");
             }
 
             AppendLogMessage("[Tâches manuelles] Fenêtres d'assistance ouvertes.");
@@ -428,6 +615,15 @@ if ($target -ne [IntPtr]::Zero) {
         {
             task.PropertyChanged += TaskOnPropertyChanged;
         }
+
+        foreach (var (name, script) in ManualWindowsToolDefinitions)
+        {
+            var tool = new ManualWindowsTool(name, script);
+            tool.PropertyChanged += ManualWindowsToolOnPropertyChanged;
+            ManualWindowsTools.Add(tool);
+        }
+
+        UpdateWindowsToolsSelectAllState();
 
         ManualTasks.Add(new ManualTask("Modifier les paramètres d’alimentation avancés : Paramètres de la carte graphique (Intel Settings ou autres) : Performance max."));
         ManualTasks.Add(new ManualTask("Win + X / gestionnaire de périphérique – Pointer les pilotes manquants."));
@@ -1176,6 +1372,12 @@ if ($target -ne [IntPtr]::Zero) {
         SetAllTasksSelection(shouldSelectAll);
     }
 
+    private void WindowsToolsSelectAllCheckBox_OnClick(object sender, RoutedEventArgs e)
+    {
+        var shouldSelectAll = ManualWindowsTools.Any(t => !t.IsSelected);
+        SetAllWindowsToolsSelection(shouldSelectAll);
+    }
+
     private void SetAllPackagesSelection(bool isSelected)
     {
         foreach (var package in Packages)
@@ -1190,6 +1392,16 @@ if ($target -ne [IntPtr]::Zero) {
         {
             task.IsSelected = isSelected;
         }
+    }
+
+    private void SetAllWindowsToolsSelection(bool isSelected)
+    {
+        foreach (var tool in ManualWindowsTools)
+        {
+            tool.IsSelected = isSelected;
+        }
+
+        UpdateWindowsToolsSelectAllState();
     }
 
     private void ApplyProfessionalModeToTasks()
@@ -1213,6 +1425,14 @@ if ($target -ne [IntPtr]::Zero) {
         if (e.PropertyName == nameof(ConfigurationTask.IsSelected))
         {
             UpdateTasksSelectAllState();
+        }
+    }
+
+    private void ManualWindowsToolOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ManualWindowsTool.IsSelected))
+        {
+            UpdateWindowsToolsSelectAllState();
         }
     }
 
@@ -1260,6 +1480,66 @@ if ($target -ne [IntPtr]::Zero) {
         }
     }
 
+    private void UpdateWindowsToolsSelectAllState()
+    {
+        if (ManualWindowsTools.Count == 0)
+        {
+            AreAllWindowsToolsSelected = false;
+            return;
+        }
+
+        var selectedCount = ManualWindowsTools.Count(tool => tool.IsSelected);
+        if (selectedCount == 0)
+        {
+            AreAllWindowsToolsSelected = false;
+        }
+        else if (selectedCount == ManualWindowsTools.Count)
+        {
+            AreAllWindowsToolsSelected = true;
+        }
+        else
+        {
+            AreAllWindowsToolsSelected = null;
+        }
+    }
+
+    private void WindowsToolsToggleButton_OnChecked(object sender, RoutedEventArgs e)
+    {
+        if (WindowsToolsPopup != null)
+        {
+            WindowsToolsPopup.IsOpen = true;
+        }
+    }
+
+    private void WindowsToolsToggleButton_OnUnchecked(object sender, RoutedEventArgs e)
+    {
+        if (WindowsToolsPopup != null)
+        {
+            WindowsToolsPopup.IsOpen = false;
+        }
+    }
+
+    private void WindowsToolsPopup_OnClosed(object? sender, EventArgs e)
+    {
+        if (WindowsToolsToggleButton != null)
+        {
+            WindowsToolsToggleButton.IsChecked = false;
+        }
+    }
+
+    private void CloseWindowsToolsPopup()
+    {
+        if (WindowsToolsPopup != null)
+        {
+            WindowsToolsPopup.IsOpen = false;
+        }
+
+        if (WindowsToolsToggleButton != null)
+        {
+            WindowsToolsToggleButton.IsChecked = false;
+        }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private void OnPropertyChanged(string propertyName)
@@ -1268,4 +1548,39 @@ if ($target -ne [IntPtr]::Zero) {
     }
 
     private sealed record PowerShellResult(int ExitCode, string StandardOutput, string StandardError);
+
+    public sealed class ManualWindowsTool : INotifyPropertyChanged
+    {
+        private bool _isSelected = true;
+
+        public ManualWindowsTool(string name, string script)
+        {
+            Name = name;
+            Script = script;
+        }
+
+        public string Name { get; }
+
+        public string Script { get; }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected != value)
+                {
+                    _isSelected = value;
+                    OnPropertyChanged(nameof(IsSelected));
+                }
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
 }
