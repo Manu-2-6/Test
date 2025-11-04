@@ -4,6 +4,12 @@ using System.Runtime.CompilerServices;
 
 namespace SoftwareSetupApp.Models;
 
+public enum SoftwareInstallationMode
+{
+    Winget,
+    CustomCommand
+}
+
 public class SoftwarePackage : INotifyPropertyChanged
 {
     private bool _isSelected;
@@ -12,15 +18,29 @@ public class SoftwarePackage : INotifyPropertyChanged
     private int _progress;
     private bool _isProgressVisible;
 
-    public SoftwarePackage(string name, string packageId)
+    public SoftwarePackage(
+        string name,
+        string packageId,
+        SoftwareInstallationMode installationMode = SoftwareInstallationMode.Winget,
+        string? customCommand = null,
+        string? workingDirectory = null)
     {
         Name = name;
         PackageId = packageId;
+        InstallationMode = installationMode;
+        CustomCommand = customCommand;
+        WorkingDirectory = workingDirectory;
     }
 
     public string Name { get; }
 
     public string PackageId { get; }
+
+    public SoftwareInstallationMode InstallationMode { get; }
+
+    public string? CustomCommand { get; }
+
+    public string? WorkingDirectory { get; }
 
     public string? LogoPath
     {
