@@ -576,6 +576,14 @@ if ($target -ne [IntPtr]::Zero) {
             Directory.CreateDirectory(directory);
         }
 
+        var mofficeDirectory = Path.Combine(AppContext.BaseDirectory, "Moffice");
+        Packages.Add(
+            new SoftwarePackage(
+                "Office 2024 LTSC Pro Plus",
+                "Custom.Office2024LTSCProPlus",
+                SoftwareInstallationMode.CustomCommand,
+                ".\\setup.exe /configure .\\Configuration.xml",
+                mofficeDirectory));
         Packages.Add(new SoftwarePackage("VLC", "VideoLAN.VLC"));
         Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome"));
         Packages.Add(new SoftwarePackage("Mozilla Firefox", "Mozilla.Firefox"));
@@ -964,7 +972,22 @@ if ($target -ne [IntPtr]::Zero) {
         {
             smoother = new ProgressSmoother(package);
             var percentProgress = new Progress<int>(value => smoother.Report(value));
-            var result = await _installer.InstallAsync(package, progress, percentProgress, cancellationToken);
+            InstallationResult result;
+
+            switch (package.InstallationMode)
+            {
+                case SoftwareInstallationMode.CustomCommand:
+                    result = await RunCustomCommandPackageAsync(package, progress, percentProgress, cancellationToken)
+                        .ConfigureAwait(false);
+                    break;
+                case SoftwareInstallationMode.Winget:
+                    result = await _installer.InstallAsync(package, progress, percentProgress, cancellationToken)
+                        .ConfigureAwait(false);
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Mode d'installation non géré : {package.InstallationMode} pour {package.Name}.");
+            }
 
             if (result.IsCanceled)
             {
@@ -1017,6 +1040,163 @@ if ($target -ne [IntPtr]::Zero) {
         finally
         {
             smoother?.Dispose();
+        }
+    }
+
+    private async Task<InstallationResult> RunCustomCommandPackageAsync(
+        SoftwarePackage package,
+        IProgress<string> progress,
+        IProgress<int>? percentProgress,
+        CancellationToken cancellationToken)
+    {
+        var command = package.CustomCommand;
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return new InstallationResult(false, false, "Aucune commande d'installation définie.");
+        }
+
+        var workingDirectory = package.WorkingDirectory;
+        if (string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            workingDirectory = AppContext.BaseDirectory;
+        }
+
+        if (!Directory.Exists(workingDirectory))
+        {
+            return new InstallationResult(false, false, $"Répertoire introuvable : {workingDirectory}");
+        }
+
+        if (command.Contains("setup.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            var setupPath = Path.Combine(workingDirectory, "setup.exe");
+            if (!File.Exists(setupPath))
+            {
+                return new InstallationResult(false, false, $"Fichier introuvable : {setupPath}");
+            }
+        }
+
+        if (command.Contains("Configuration.xml", StringComparison.OrdinalIgnoreCase))
+        {
+            var configPath = Path.Combine(workingDirectory, "Configuration.xml");
+            if (!File.Exists(configPath))
+            {
+                return new InstallationResult(false, false, $"Fichier introuvable : {configPath}");
+            }
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = $"/c {command}",
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
+        };
+
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+            var outputBuilder = new StringBuilder();
+            var errorBuilder = new StringBuilder();
+            var outputCompletion = new TaskCompletionSource<object?>();
+            var errorCompletion = new TaskCompletionSource<object?>();
+
+            process.OutputDataReceived += (_, args) =>
+            {
+                if (args.Data == null)
+                {
+                    outputCompletion.TrySetResult(null);
+                    return;
+                }
+
+                outputBuilder.AppendLine(args.Data);
+                progress.Report($"[{package.Name}] {args.Data}");
+            };
+
+            process.ErrorDataReceived += (_, args) =>
+            {
+                if (args.Data == null)
+                {
+                    errorCompletion.TrySetResult(null);
+                    return;
+                }
+
+                errorBuilder.AppendLine(args.Data);
+                progress.Report($"[{package.Name}] {args.Data}");
+            };
+
+            percentProgress?.Report(5);
+            progress.Report($"[{package.Name}] Lancement de la commande d'installation personnalisée.");
+
+            if (!process.Start())
+            {
+                return new InstallationResult(false, false, "Impossible de démarrer le processus d'installation personnalisé.");
+            }
+
+            using var registration = cancellationToken.Register(() =>
+            {
+                try
+                {
+                    if (!process.HasExited)
+                    {
+                        process.Kill(true);
+                    }
+                }
+                catch
+                {
+                    // Ignored
+                }
+            });
+
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            percentProgress?.Report(25);
+
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+                await Task.WhenAll(outputCompletion.Task, errorCompletion.Task).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return new InstallationResult(false, true, string.Empty);
+            }
+
+            percentProgress?.Report(95);
+
+            var output = outputBuilder.ToString().Trim();
+            var error = errorBuilder.ToString().Trim();
+            var message = string.IsNullOrWhiteSpace(error) ? output : error;
+
+            var isSuccess = process.ExitCode == 0;
+
+            if (isSuccess)
+            {
+                percentProgress?.Report(100);
+                return new InstallationResult(true, false, string.Empty);
+            }
+
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                message = "La commande personnalisée s'est terminée avec une erreur.";
+            }
+
+            return new InstallationResult(false, false, message);
+        }
+        catch (OperationCanceledException)
+        {
+            return new InstallationResult(false, true, string.Empty);
+        }
+        catch (Exception ex)
+        {
+            return new InstallationResult(false, false, ex.Message);
         }
     }
 
