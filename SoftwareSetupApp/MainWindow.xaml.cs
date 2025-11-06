@@ -568,13 +568,8 @@ if ($target -ne [IntPtr]::Zero) {
         Loaded += (_, _) => PositionWindowOnRightHalf();
 
         _logoDirectories = BuildLogoDirectories();
-
         ((INotifyCollectionChanged)Logs).CollectionChanged += LogsOnCollectionChanged;
-
-        foreach (var directory in _logoDirectories)
-        {
-            Directory.CreateDirectory(directory);
-        }
+        EnsureOutputLogoDirectoryExists();
 
         var mofficeDirectory = Path.Combine(AppContext.BaseDirectory, "Moffice");
         Packages.Add(
@@ -589,7 +584,7 @@ if ($target -ne [IntPtr]::Zero) {
         Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome"));
         Packages.Add(new SoftwarePackage("Mozilla Firefox", "Mozilla.Firefox"));
         Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
-        Packages.Add(new SoftwarePackage("CPU-Z", "CPUID.CPU-Z"));
+        Packages.Add(new SoftwarePackage("CPUZ", "CPUID.CPU-Z"));
 
         foreach (var package in Packages)
         {
@@ -913,6 +908,20 @@ if ($target -ne [IntPtr]::Zero) {
             LogListBox_OnUnloaded(LogListBox, new RoutedEventArgs());
         }
         base.OnClosed(e);
+    }
+
+    private void EnsureOutputLogoDirectoryExists()
+    {
+        try
+        {
+            var baseDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Logos");
+            Directory.CreateDirectory(baseDirectory);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Impossible de préparer le dossier des logos : {ex}");
+            Logs.Add("Impossible de préparer le dossier des logos.");
+        }
     }
 
     private List<string> BuildLogoDirectories()
