@@ -568,13 +568,8 @@ if ($target -ne [IntPtr]::Zero) {
         Loaded += (_, _) => PositionWindowOnRightHalf();
 
         _logoDirectories = BuildLogoDirectories();
-
         ((INotifyCollectionChanged)Logs).CollectionChanged += LogsOnCollectionChanged;
-
-        foreach (var directory in _logoDirectories)
-        {
-            Directory.CreateDirectory(directory);
-        }
+        EnsureOutputLogoDirectoryExists();
 
         var mofficeDirectory = Path.Combine(AppContext.BaseDirectory, "Moffice");
         Packages.Add(
@@ -584,11 +579,12 @@ if ($target -ne [IntPtr]::Zero) {
                 SoftwareInstallationMode.CustomCommand,
                 ".\\setup.exe /configure .\\Configuration.xml",
                 mofficeDirectory));
+        Packages.Add(new SoftwarePackage("LibreOffice", "TheDocumentFoundation.LibreOffice"));
         Packages.Add(new SoftwarePackage("VLC", "VideoLAN.VLC"));
         Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome"));
         Packages.Add(new SoftwarePackage("Mozilla Firefox", "Mozilla.Firefox"));
         Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
-        Packages.Add(new SoftwarePackage("LibreOffice", "TheDocumentFoundation.LibreOffice"));
+        Packages.Add(new SoftwarePackage("CPU-Z", "CPUID.CPU-Z"));
 
         foreach (var package in Packages)
         {
@@ -672,6 +668,7 @@ if ($target -ne [IntPtr]::Zero) {
         ManualTasks.Add(new ManualTask("Win + X / Terminal (ou PowerShell) en admin / chkdsk c: /F + confirmer / sfc /scannow Redémarrer."));
         ManualTasks.Add(new ManualTask("🔎dfrgui ou « Ce PC » / clic droit sur C: / Propriété / Onglet Outils / Cocher « Vue Avancé » / Lancer « Optimiser » sur chacune des partitions quand cela est possible."));
         ManualTasks.Add(new ManualTask("UNIQUEMENT POUR LES PRO :  - Désactiver la mise en veille USB dans le gestionnaire de périphériques, - Désactiver la mise en veille du réseau."));
+        ManualTasks.Add(new ManualTask("Désactiver les logiciels non nécessaire au démarrage."));
 
         LoadPackageLogos();
         UpdateProgramsSelectAllState();
@@ -911,6 +908,20 @@ if ($target -ne [IntPtr]::Zero) {
             LogListBox_OnUnloaded(LogListBox, new RoutedEventArgs());
         }
         base.OnClosed(e);
+    }
+
+    private void EnsureOutputLogoDirectoryExists()
+    {
+        try
+        {
+            var baseDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Logos");
+            Directory.CreateDirectory(baseDirectory);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Impossible de préparer le dossier des logos : {ex}");
+            Logs.Add("Impossible de préparer le dossier des logos.");
+        }
     }
 
     private List<string> BuildLogoDirectories()
