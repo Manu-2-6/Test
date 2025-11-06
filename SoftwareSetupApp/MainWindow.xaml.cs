@@ -663,12 +663,12 @@ if ($target -ne [IntPtr]::Zero) {
         ManualTasks.Add(new ManualTask("Clic droit bureau – Personnaliser – Thèmes – Paramètres des icones du Bureau – Cocher Ordinateur + Fichiers de l’utilisateur + Corbeille."));
         ManualTasks.Add(new ManualTask("Mettre « Ce PC » en dessous « Fichiers de l’utilisateur » au nom de l’utilisateur."));
         ManualTasks.Add(new ManualTask("Installer Google Chrome et/ou Firefox + Acrobat Reader + VLC + accords client."));
-        ManualTasks.Add(new ManualTask("Désactiver les logiciels non nécessaire au démarrage."));
         ManualTasks.Add(new ManualTask("Dès lors que Windows Update et Microsoft Store OK : win + R / cleanmgr / « Nettoyer les fichiers système » / Tout cocher sauf Corbeille, Redémarrer."));
         ManualTasks.Add(new ManualTask("Nettoyer traces des téléchargements, historiques navigation."));
         ManualTasks.Add(new ManualTask("Win + X / Terminal (ou PowerShell) en admin / chkdsk c: /F + confirmer / sfc /scannow Redémarrer."));
         ManualTasks.Add(new ManualTask("🔎dfrgui ou « Ce PC » / clic droit sur C: / Propriété / Onglet Outils / Cocher « Vue Avancé » / Lancer « Optimiser » sur chacune des partitions quand cela est possible."));
         ManualTasks.Add(new ManualTask("UNIQUEMENT POUR LES PRO :  - Désactiver la mise en veille USB dans le gestionnaire de périphériques, - Désactiver la mise en veille du réseau."));
+        ManualTasks.Add(new ManualTask("Désactiver les logiciels non nécessaire au démarrage."));
 
         LoadPackageLogos();
         UpdateProgramsSelectAllState();
