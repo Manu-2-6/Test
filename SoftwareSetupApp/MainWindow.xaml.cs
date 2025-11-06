@@ -584,11 +584,12 @@ if ($target -ne [IntPtr]::Zero) {
                 SoftwareInstallationMode.CustomCommand,
                 ".\\setup.exe /configure .\\Configuration.xml",
                 mofficeDirectory));
+        Packages.Add(new SoftwarePackage("LibreOffice", "TheDocumentFoundation.LibreOffice"));
         Packages.Add(new SoftwarePackage("VLC", "VideoLAN.VLC"));
         Packages.Add(new SoftwarePackage("Google Chrome", "Google.Chrome"));
         Packages.Add(new SoftwarePackage("Mozilla Firefox", "Mozilla.Firefox"));
         Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
-        Packages.Add(new SoftwarePackage("LibreOffice", "TheDocumentFoundation.LibreOffice"));
+        Packages.Add(new SoftwarePackage("CPU-Z", "CPUID.CPU-Z"));
 
         foreach (var package in Packages)
         {
@@ -667,6 +668,7 @@ if ($target -ne [IntPtr]::Zero) {
         ManualTasks.Add(new ManualTask("Clic droit bureau – Personnaliser – Thèmes – Paramètres des icones du Bureau – Cocher Ordinateur + Fichiers de l’utilisateur + Corbeille."));
         ManualTasks.Add(new ManualTask("Mettre « Ce PC » en dessous « Fichiers de l’utilisateur » au nom de l’utilisateur."));
         ManualTasks.Add(new ManualTask("Installer Google Chrome et/ou Firefox + Acrobat Reader + VLC + accords client."));
+        ManualTasks.Add(new ManualTask("Désactiver les logiciels non nécessaire au démarrage."));
         ManualTasks.Add(new ManualTask("Dès lors que Windows Update et Microsoft Store OK : win + R / cleanmgr / « Nettoyer les fichiers système » / Tout cocher sauf Corbeille, Redémarrer."));
         ManualTasks.Add(new ManualTask("Nettoyer traces des téléchargements, historiques navigation."));
         ManualTasks.Add(new ManualTask("Win + X / Terminal (ou PowerShell) en admin / chkdsk c: /F + confirmer / sfc /scannow Redémarrer."));
