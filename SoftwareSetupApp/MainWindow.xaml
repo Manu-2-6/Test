@@ -283,6 +283,7 @@
                                         <CheckBox Content="Tout sélectionner"
                                                   Margin="0 0 0 8"
                                                   IsThreeState="True"
+                                                  Click="WindowsToolsSelectAllCheckBox_OnClick"
                                                   IsChecked="{Binding AreAllWindowsToolsSelected, Mode=TwoWay}" />
                                         <Separator Margin="0 0 0 8" />
                                         <ItemsControl ItemsSource="{Binding ManualWindowsTools}">
@@ -330,18 +331,29 @@
                                         </Border.Style>
                                         <CheckBox IsChecked="{Binding IsCompleted, Mode=TwoWay}" VerticalAlignment="Top">
                                             <CheckBox.Content>
-                                                <TextBlock Text="{Binding Name}" TextWrapping="Wrap" Foreground="#1F2933">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Foreground" Value="#1F2933" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsCompleted}" Value="True">
-                                                                    <Setter Property="TextDecorations" Value="Strikethrough" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="#1F2933">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="#1F2933" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                        <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <TextBlock Margin="0 4 0 0"
+                                                               Visibility="{Binding HasAssociatedTool, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                        <Hyperlink Click="ManualTaskOpenToolHyperlink_OnClick"
+                                                                   Foreground="#2F73DA">
+                                                            <Run Text="{Binding AssociatedToolName}" />
+                                                        </Hyperlink>
+                                                    </TextBlock>
+                                                </StackPanel>
                                             </CheckBox.Content>
                                         </CheckBox>
                                     </Border>
