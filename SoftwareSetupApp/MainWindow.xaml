@@ -7,8 +7,8 @@
         xmlns:converters="clr-namespace:SoftwareSetupApp.Converters"
         xmlns:models="clr-namespace:SoftwareSetupApp.Models"
         mc:Ignorable="d"
-        Title="Post-installation W11 Setup" Height="500" Width="680"
-        MinWidth="620" MinHeight="420"
+        Title="Post-installation W11 Setup" Height="720" Width="960"
+        MinWidth="860" MinHeight="600"
         UseLayoutRounding="True"
         Icon="/SoftwareSetupApp;component/Assets/Logos/Amix.png">
     <Window.Resources>
@@ -150,6 +150,36 @@
         <Style TargetType="ListView">
             <Setter Property="Background" Value="Transparent" />
         </Style>
+
+        <Style x:Key="HoverListViewItemStyle" TargetType="ListViewItem">
+            <Setter Property="Margin" Value="0 6" />
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border x:Name="border"
+                                Background="Transparent"
+                                CornerRadius="10"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#EEF2FF" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#E0E7FF" />
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid Background="{StaticResource WindowBackgroundBrush}">
@@ -203,16 +233,11 @@
                                           ItemsSource="{Binding Packages}"
                                           BorderThickness="0"
                                           ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                    <ListView.Resources>
-                                        <Style TargetType="ListViewItem">
-                                            <Setter Property="Padding" Value="4" />
-                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                        </Style>
-                                    </ListView.Resources>
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ItemContainerStyle="{StaticResource HoverListViewItemStyle}">
                                     <ListView.ItemTemplate>
                                         <DataTemplate DataType="{x:Type models:SoftwarePackage}">
-                                            <Grid Margin="0 6">
+                                            <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="220" />
@@ -341,16 +366,11 @@
                                           ItemsSource="{Binding ConfigurationTasks}"
                                           BorderThickness="0"
                                           ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                    <ListView.Resources>
-                                        <Style TargetType="ListViewItem">
-                                            <Setter Property="Padding" Value="4" />
-                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                        </Style>
-                                    </ListView.Resources>
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ItemContainerStyle="{StaticResource HoverListViewItemStyle}">
                                     <ListView.ItemTemplate>
                                         <DataTemplate DataType="{x:Type models:ConfigurationTask}">
-                                            <Grid Margin="0 6">
+                                            <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="220" />
@@ -457,13 +477,8 @@
                                           ItemsSource="{Binding ManualTasks}"
                                           BorderThickness="0"
                                           ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                    <ListView.Resources>
-                                        <Style TargetType="ListViewItem">
-                                            <Setter Property="Padding" Value="4" />
-                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                        </Style>
-                                    </ListView.Resources>
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ItemContainerStyle="{StaticResource HoverListViewItemStyle}">
                                     <ListView.ItemTemplate>
                                         <DataTemplate DataType="{x:Type models:ManualTask}">
                                             <Border Padding="12"
