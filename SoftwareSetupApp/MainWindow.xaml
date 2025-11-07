@@ -170,22 +170,17 @@
                     <RowDefinition Height="2*" />
                 </Grid.RowDefinitions>
 
-                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0 0 0 24">
-                    <StackPanel Orientation="Horizontal"
-                                Margin="0 0 0 16"
-                                VerticalAlignment="Center">
-                        <Image Source="/SoftwareSetupApp;component/Assets/Logos/Amix.png"
-                               Width="140"
-                               Height="140"
-                               Stretch="Uniform"
-                               RenderOptions.BitmapScalingMode="HighQuality"
-                               SnapsToDevicePixels="True" />
-                    </StackPanel>
-                    <TextBlock Text="Sélectionnez les logiciels winget ou les tâches Windows à appliquer puis cliquez sur &quot;Installer&quot;."
-                               Margin="0 8 0 0"
-                               FontWeight="Bold"
-                               FontSize="18"
-                               Foreground="{StaticResource NeutralForegroundBrush}" />
+                <StackPanel Orientation="Horizontal"
+                            Grid.Row="0"
+                            Margin="0 0 0 16"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <Image Source="/SoftwareSetupApp;component/Assets/Logos/Amix.png"
+                           Width="140"
+                           Height="140"
+                           Stretch="Uniform"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           SnapsToDevicePixels="True" />
                 </StackPanel>
 
                 <TabControl Grid.Row="1" Margin="0">
