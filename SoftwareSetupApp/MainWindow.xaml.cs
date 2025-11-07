@@ -641,6 +641,20 @@ if ($target -ne [IntPtr]::Zero) {
                 Description = "Règle l'arrêt des disques durs sur 0 minute (jamais) sur secteur et batterie."
             });
 
+        ConfigurationTasks.Add(
+            new ConfigurationTask(
+                "Désactiver Widgets et Vue Tâches + remplacer icône de recherche",
+                new[]
+                {
+                    @"reg add ""HKLM\SOFTWARE\Policies\Microsoft\Dsh"" /v AllowNewsAndInterests /t REG_DWORD /d 0 /f",
+                    @"reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"" /v ShowTaskViewButton /t REG_DWORD /d 0 /f",
+                    @"reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Search"" /v SearchboxTaskbarMode /t REG_DWORD /d 1 /f",
+                    "Stop-Process -Name explorer -Force"
+                })
+            {
+                Description = "Désactive les widgets, masque le bouton Vue Tâches et remplace la zone de recherche par une icône."
+            });
+
         foreach (var task in ConfigurationTasks)
         {
             task.PropertyChanged += TaskOnPropertyChanged;
