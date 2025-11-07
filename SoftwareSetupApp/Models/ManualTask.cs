@@ -35,7 +35,7 @@ public class ManualTask : INotifyPropertyChanged
 
     public bool HasAssociatedTool => AssociatedTool != null;
 
-    public string? AssociatedToolName => AssociatedTool?.Name;
+    public string AssociatedToolName => AssociatedTool?.Name ?? string.Empty;
 
     public bool IsCompleted
     {
