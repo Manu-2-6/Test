@@ -12,6 +12,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -538,6 +539,70 @@ if ($target -ne [IntPtr]::Zero) {
         }
     }
 
+    private void ManualTaskHyperlink_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Hyperlink hyperlink)
+        {
+            return;
+        }
+
+        if (hyperlink.DataContext is not ManualTask task)
+        {
+            return;
+        }
+
+        var script = task.LinkScript;
+        if (string.IsNullOrWhiteSpace(script))
+        {
+            return;
+        }
+
+        var linkLabel = task.LinkText ?? task.Name;
+
+        try
+        {
+            AppendLogMessage($"[Tâches manuelles] Ouverture de {linkLabel}...");
+            LaunchPowerShellScriptElevated(script);
+            AppendLogMessage($"[Tâches manuelles] {linkLabel} ouvert.");
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            AppendLogMessage($"[Tâches manuelles] Ouverture de {linkLabel} annulée par l'utilisateur.");
+        }
+        catch (Exception ex)
+        {
+            AppendLogMessage($"[Tâches manuelles] Échec lors de l'ouverture de {linkLabel} : {ex.Message}");
+            MessageBox.Show(
+                $"Une erreur s'est produite lors de l'ouverture de {linkLabel} : {ex.Message}",
+                "Erreur",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private static void LaunchPowerShellScriptElevated(string script)
+    {
+        if (string.IsNullOrWhiteSpace(script))
+        {
+            return;
+        }
+
+        var encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
+            UseShellExecute = true,
+            Verb = "runas"
+        };
+
+        if (Process.Start(startInfo) == null)
+        {
+            throw new InvalidOperationException("Impossible de démarrer PowerShell.");
+        }
+    }
+
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
         if (!IsInstalling || _installationCts == null)
@@ -669,7 +734,11 @@ if ($target -ne [IntPtr]::Zero) {
 
         UpdateWindowsToolsSelectAllState();
 
-        ManualTasks.Add(new ManualTask("Modifier les paramètres d’alimentation avancés : Paramètres de la carte graphique (Intel Settings ou autres) : Performance max."));
+        ManualTasks.Add(
+            new ManualTask(
+                "Modifier les paramètres d’alimentation avancés : Paramètres de la carte graphique (Intel Settings ou autres) : Performance max.",
+                "Options d'alimentation",
+                PowerOptionsScript));
         ManualTasks.Add(new ManualTask("Win + X / gestionnaire de périphérique – Pointer les pilotes manquants."));
         ManualTasks.Add(new ManualTask("Windows Update : rechercher et lancer + options avancées / Mises à jour facultatives : les cocher et les installer, Redémarrer dès lors que tout est installé. Relancer les updates jusqu’à ce qu’il n’y en ait plus, Vérifier que les pilotes soient correctement installés si non, site constructeur (ou HP Assistant et consorts)."));
         ManualTasks.Add(new ManualTask("Microsoft Store – Téléchargement – « Obtenir les mises à jour » ou « Tout mettre à jour »."));

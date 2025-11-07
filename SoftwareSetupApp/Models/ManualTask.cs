@@ -7,12 +7,20 @@ public class ManualTask : INotifyPropertyChanged
 {
     private bool _isCompleted;
 
-    public ManualTask(string name)
+    public ManualTask(string name, string? linkText = null, string? linkScript = null)
     {
         Name = name;
+        LinkText = linkText;
+        LinkScript = linkScript;
     }
 
     public string Name { get; }
+
+    public string? LinkText { get; }
+
+    public string? LinkScript { get; }
+
+    public bool HasLink => !string.IsNullOrWhiteSpace(LinkText) && !string.IsNullOrWhiteSpace(LinkScript);
 
     public bool IsCompleted
     {
