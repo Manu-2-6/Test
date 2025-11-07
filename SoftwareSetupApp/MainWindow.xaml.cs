@@ -557,7 +557,7 @@ if ($target -ne [IntPtr]::Zero) {
             return;
         }
 
-        var linkLabel = task.LinkText ?? task.Name;
+        var linkLabel = string.IsNullOrWhiteSpace(task.LinkText) ? task.Name : task.LinkText;
 
         try
         {

@@ -10,15 +10,15 @@ public class ManualTask : INotifyPropertyChanged
     public ManualTask(string name, string? linkText = null, string? linkScript = null)
     {
         Name = name;
-        LinkText = linkText;
-        LinkScript = linkScript;
+        LinkText = linkText?.Trim() ?? string.Empty;
+        LinkScript = linkScript?.Trim() ?? string.Empty;
     }
 
     public string Name { get; }
 
-    public string? LinkText { get; }
+    public string LinkText { get; }
 
-    public string? LinkScript { get; }
+    public string LinkScript { get; }
 
     public bool HasLink => !string.IsNullOrWhiteSpace(LinkText) && !string.IsNullOrWhiteSpace(LinkScript);
 
