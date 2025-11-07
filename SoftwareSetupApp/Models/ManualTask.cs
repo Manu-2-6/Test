@@ -6,36 +6,23 @@ namespace SoftwareSetupApp.Models;
 public class ManualTask : INotifyPropertyChanged
 {
     private bool _isCompleted;
-    private ManualWindowsTool? _associatedTool;
 
-    public ManualTask(string name, ManualWindowsTool? associatedTool = null)
+    public ManualTask(string name, string? associatedToolKey = null, string? associatedToolDisplayName = null)
     {
         Name = name;
-        AssociatedTool = associatedTool;
+        AssociatedToolKey = string.IsNullOrWhiteSpace(associatedToolKey) ? null : associatedToolKey;
+        AssociatedToolDisplayName = associatedToolDisplayName
+            ?? associatedToolKey
+            ?? string.Empty;
     }
 
     public string Name { get; }
 
-    public ManualWindowsTool? AssociatedTool
-    {
-        get => _associatedTool;
-        set
-        {
-            if (_associatedTool == value)
-            {
-                return;
-            }
+    public string? AssociatedToolKey { get; }
 
-            _associatedTool = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(HasAssociatedTool));
-            OnPropertyChanged(nameof(AssociatedToolName));
-        }
-    }
+    public string AssociatedToolDisplayName { get; }
 
-    public bool HasAssociatedTool => AssociatedTool != null;
-
-    public string AssociatedToolName => AssociatedTool?.Name ?? string.Empty;
+    public bool HasAssociatedTool => !string.IsNullOrWhiteSpace(AssociatedToolKey);
 
     public bool IsCompleted
     {

@@ -350,7 +350,7 @@
                                                                Visibility="{Binding HasAssociatedTool, Converter={StaticResource BooleanToVisibilityConverter}}">
                                                         <Hyperlink Click="ManualTaskOpenToolHyperlink_OnClick"
                                                                    Foreground="#2F73DA">
-                                                            <Run Text="{Binding AssociatedToolName}" />
+                                                            <Run Text="{Binding AssociatedToolDisplayName}" />
                                                         </Hyperlink>
                                                     </TextBlock>
                                                 </StackPanel>

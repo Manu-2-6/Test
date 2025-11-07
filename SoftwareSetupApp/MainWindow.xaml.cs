@@ -554,8 +554,26 @@ if ($target -ne [IntPtr]::Zero) {
             return;
         }
 
-        if (hyperlink.DataContext is not ManualTask task || task.AssociatedTool is null)
+        if (hyperlink.DataContext is not ManualTask task)
         {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(task.AssociatedToolKey))
+        {
+            return;
+        }
+
+        var tool = GetManualWindowsTool(task.AssociatedToolKey);
+        if (tool is null)
+        {
+            AppendLogMessage(
+                $"[Tâches manuelles] Impossible de trouver l'outil associé \"{task.AssociatedToolDisplayName}\" pour la tâche {task.Name}.");
+            MessageBox.Show(
+                $"L'outil Windows \"{task.AssociatedToolDisplayName}\" n'est plus disponible.",
+                "Fenêtre introuvable",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             return;
         }
 
@@ -563,13 +581,14 @@ if ($target -ne [IntPtr]::Zero) {
 
         try
         {
-            await OpenManualWindowsToolsAsync(new[] { task.AssociatedTool });
+            await OpenManualWindowsToolsAsync(new[] { tool });
         }
         catch (Exception ex)
         {
-            AppendLogMessage($"[Tâches manuelles] Échec lors de l'ouverture de {task.AssociatedTool.Name} : {ex.Message}");
+            AppendLogMessage(
+                $"[Tâches manuelles] Échec lors de l'ouverture de {task.AssociatedToolDisplayName} : {ex.Message}");
             MessageBox.Show(
-                $"Une erreur s'est produite lors de l'ouverture de {task.AssociatedTool.Name} : {ex.Message}",
+                $"Une erreur s'est produite lors de l'ouverture de {task.AssociatedToolDisplayName} : {ex.Message}",
                 "Erreur",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -710,40 +729,40 @@ if ($target -ne [IntPtr]::Zero) {
         ManualTasks.Add(
             new ManualTask(
                 "Modifier les paramètres d’alimentation avancés : Paramètres de la carte graphique (Intel Settings ou autres) : Performance max.",
-                GetManualWindowsTool("Options d'alimentation")));
+                "Options d'alimentation"));
         ManualTasks.Add(
             new ManualTask(
                 "Win + X / gestionnaire de périphérique – Pointer les pilotes manquants.",
-                GetManualWindowsTool("Gestionnaire de périphériques")));
+                "Gestionnaire de périphériques"));
         ManualTasks.Add(
             new ManualTask(
                 "Windows Update : rechercher et lancer + options avancées / Mises à jour facultatives : les cocher et les installer, Redémarrer dès lors que tout est installé. Relancer les updates jusqu’à ce qu’il n’y en ait plus, Vérifier que les pilotes soient correctement installés si non, site constructeur (ou HP Assistant et consorts).",
-                GetManualWindowsTool("Windows Update")));
+                "Windows Update"));
         ManualTasks.Add(
             new ManualTask(
                 "Microsoft Store – Téléchargement – « Obtenir les mises à jour » ou « Tout mettre à jour ».",
-                GetManualWindowsTool("Microsoft Store")));
+                "Microsoft Store"));
         ManualTasks.Add(new ManualTask("Supprimer app pub type Xbox ou Linkedin."));
         ManualTasks.Add(
             new ManualTask(
                 "Clic droit bureau – Personnaliser – Thèmes – Paramètres des icones du Bureau – Cocher Ordinateur + Fichiers de l’utilisateur + Corbeille.",
-                GetManualWindowsTool("Paramètres des icônes du Bureau")));
+                "Paramètres des icônes du Bureau"));
         ManualTasks.Add(new ManualTask("Mettre « Ce PC » en dessous « Fichiers de l’utilisateur » au nom de l’utilisateur."));
         ManualTasks.Add(new ManualTask("Installer Google Chrome et/ou Firefox + Acrobat Reader + VLC + accords client."));
         ManualTasks.Add(
             new ManualTask(
                 "Dès lors que Windows Update et Microsoft Store OK : win + R / cleanmgr / « Nettoyer les fichiers système » / Tout cocher sauf Corbeille, Redémarrer.",
-                GetManualWindowsTool("Nettoyage de disque")));
+                "Nettoyage de disque"));
         ManualTasks.Add(new ManualTask("Nettoyer traces des téléchargements, historiques navigation."));
         ManualTasks.Add(new ManualTask("Win + X / Terminal (ou PowerShell) en admin / chkdsk c: /F + confirmer / sfc /scannow Redémarrer."));
         ManualTasks.Add(
             new ManualTask(
                 "🔎dfrgui ou « Ce PC » / clic droit sur C: / Propriété / Onglet Outils / Cocher « Vue Avancé » / Lancer « Optimiser » sur chacune des partitions quand cela est possible.",
-                GetManualWindowsTool("Optimiser les lecteurs")));
+                "Optimiser les lecteurs"));
         ManualTasks.Add(
             new ManualTask(
                 "UNIQUEMENT POUR LES PRO :  - Désactiver la mise en veille USB dans le gestionnaire de périphériques, - Désactiver la mise en veille du réseau.",
-                GetManualWindowsTool("Gestionnaire de périphériques")));
+                "Gestionnaire de périphériques"));
         ManualTasks.Add(new ManualTask("Désactiver les logiciels non nécessaire au démarrage."));
 
         LoadPackageLogos();
