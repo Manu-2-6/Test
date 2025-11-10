@@ -698,7 +698,10 @@ Write-Host ('✅ Processus lancé : {0}' -f $dst)
 # =====================================================================
 # Fin du script
 # =====================================================================
-'@; $path = Join-Path $env:TEMP 'Install_AMD_Adrenalin.ps1'; Set-Content -Path $path -Value $script -Encoding UTF8; & powershell -NoProfile -ExecutionPolicy Bypass -File $path"
+'@
+$path = Join-Path $env:TEMP 'Install_AMD_Adrenalin.ps1'
+Set-Content -Path $path -Value $script -Encoding UTF8
+& powershell -NoProfile -ExecutionPolicy Bypass -File $path"
 """;
 
         Packages.Add(
