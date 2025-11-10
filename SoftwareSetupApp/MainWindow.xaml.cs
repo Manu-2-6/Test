@@ -572,6 +572,9 @@ if ($target -ne [IntPtr]::Zero) {
         EnsureOutputLogoDirectoryExists();
 
         var mofficeDirectory = Path.Combine(AppContext.BaseDirectory, "Moffice");
+        const string amdAdrenalinCommand = """
+            powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; Write-Host 'Recherche de la dernière version AMD Adrenalin...'; $cache = Join-Path $env:ProgramData 'AMD\AdrenalinCache'; New-Item -ItemType Directory -Force -Path $cache | Out-Null; [int]$year = [int](Get-Date -UFormat '%y'); $latestPage = $null; foreach ($yy in @([int]$year, [int]($year - 1))) { foreach ($mm in (12..1)) { foreach ($p in (3..1)) { $slug = '{0}-{1:D2}-{2}' -f $yy, $mm, $p; $url = 'https://www.amd.com/en/resources/support-articles/release-notes/RN-RAD-WIN-' + $slug + '.html'; try { $r = Invoke-WebRequest -Method Head -UseBasicParsing -TimeoutSec 5 -Uri $url; if ($r.StatusCode -eq 200) { $latestPage = $url; Write-Host ('Page trouvée : ' + $url); break } } catch {} } if ($latestPage) { break } } if ($latestPage) { break } } if (-not $latestPage) { throw 'Impossible de trouver la page AMD la plus récente.' } $page = Invoke-WebRequest -UseBasicParsing -Uri $latestPage; $exe = ($page.Links | Where-Object href -match 'https?://drivers\.amd\.com/.*\.exe').href | Select-Object -First 1; if (-not $exe) { $m = [regex]::Match($page.Content, 'https?://drivers\.amd\.com/[^\s""<>]+\.exe', 'IgnoreCase'); if ($m.Success) { $exe = $m.Value } } if (-not $exe) { throw 'Lien de téléchargement introuvable.' } $fname = [System.IO.Path]::GetFileName(($exe -split '\?')[0]); $dst = Join-Path $cache $fname; function Download-AMDFile { param([string]$url) if (Test-Path $dst) { Remove-Item $dst -Force } Write-Host ('Téléchargement : ' + $url); & curl.exe -L -f --retry 5 --retry-delay 5 -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' -e 'https://www.amd.com/' --output $dst $url } Download-AMDFile $exe; if ((Test-Path $dst) -and ((Get-Item $dst).Length -lt 1000000000)) { Write-Host 'Fichier incomplet, tentative HTTP...'; $altUrl = $exe -replace '^https://drivers', 'http://download'; Download-AMDFile $altUrl } if (-not (Test-Path $dst)) { throw 'Téléchargement échoué.' } $size = (Get-Item $dst).Length; if ($size -lt 1000000000) { throw 'Fichier trop petit : téléchargement incomplet.' } Write-Host ('Fichier valide : ' + [math]::Round($size / 1MB) + ' Mo'); Start-Process $dst; Write-Host 'Installation lancée.'"
+            """;
         Packages.Add(
             new SoftwarePackage(
                 "Office 2024 LTSC Pro Plus",
@@ -585,6 +588,12 @@ if ($target -ne [IntPtr]::Zero) {
         Packages.Add(new SoftwarePackage("Mozilla Firefox", "Mozilla.Firefox"));
         Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
         Packages.Add(new SoftwarePackage("CPU-Z", "CPUID.CPU-Z"));
+        Packages.Add(
+            new SoftwarePackage(
+                "AMD Software Adrenalin",
+                "Custom.AMDSoftwareAdrenalin",
+                SoftwareInstallationMode.CustomCommand,
+                amdAdrenalinCommand));
         Packages.Add(
             new SoftwarePackage(
                 "NVIDIA App",
