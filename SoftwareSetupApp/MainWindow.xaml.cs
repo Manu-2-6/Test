@@ -586,8 +586,7 @@ if ($target -ne [IntPtr]::Zero) {
         Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
         Packages.Add(new SoftwarePackage("CPU-Z", "CPUID.CPU-Z"));
 
-        const string amdAdrenalinInstallCommand = """
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$script = @'
+        const string amdAdrenalinScript = """
 # =====================================================================
 # Script : Install_AMD_Adrenalin.ps1
 # Objectif : Télécharger et installer automatiquement la dernière
@@ -698,11 +697,10 @@ Write-Host ('✅ Processus lancé : {0}' -f $dst)
 # =====================================================================
 # Fin du script
 # =====================================================================
-'@
-$path = Join-Path $env:TEMP 'Install_AMD_Adrenalin.ps1'
-Set-Content -Path $path -Value $script -Encoding UTF8
-& powershell -NoProfile -ExecutionPolicy Bypass -File $path"
 """;
+
+        var amdAdrenalinInstallCommand =
+            $"powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand {Convert.ToBase64String(Encoding.Unicode.GetBytes(amdAdrenalinScript))}";
 
         Packages.Add(
             new SoftwarePackage(
