@@ -585,6 +585,12 @@ if ($target -ne [IntPtr]::Zero) {
         Packages.Add(new SoftwarePackage("Mozilla Firefox", "Mozilla.Firefox"));
         Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
         Packages.Add(new SoftwarePackage("CPU-Z", "CPUID.CPU-Z"));
+        Packages.Add(
+            new SoftwarePackage(
+                "NVIDIA App",
+                "Custom.NvidiaApp",
+                SoftwareInstallationMode.CustomCommand,
+                @"powershell -NoProfile -ExecutionPolicy Bypass -Command ""$landing='https://www.nvidia.com/en-us/software/nvidia-app/'; $h=Invoke-WebRequest -UseBasicParsing $landing; $exe=($h.Links | Where-Object href -match 'https://us\.download\.nvidia\.com/nvapp/client/[\d\.]+/NVIDIA_app_(beta_)?v[\d\.]+\.exe').href | Sort-Object { [version](($_ -split '/')[5]) } -Descending | Select-Object -First 1; if(-not $exe){ throw 'Impossible de trouver l''installeur NVIDIA App sur la page.' } $dst=Join-Path $env:TEMP 'NVIDIA_app_latest.exe'; Invoke-WebRequest -Uri $exe -OutFile $dst; if((Get-Item $dst).Length -lt 100000){ throw 'Téléchargement invalide: ' + $exe } if((Get-AuthenticodeSignature $dst).Status -ne 'Valid'){ throw 'Signature non valide: ' + $dst } Start-Process $dst"""));
 
         foreach (var package in Packages)
         {
