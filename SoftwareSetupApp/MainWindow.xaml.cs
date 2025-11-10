@@ -585,6 +585,128 @@ if ($target -ne [IntPtr]::Zero) {
         Packages.Add(new SoftwarePackage("Mozilla Firefox", "Mozilla.Firefox"));
         Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
         Packages.Add(new SoftwarePackage("CPU-Z", "CPUID.CPU-Z"));
+
+        const string amdAdrenalinInstallCommand = """
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$script = @'
+# =====================================================================
+# Script : Install_AMD_Adrenalin.ps1
+# Objectif : Télécharger et installer automatiquement la dernière
+#             version de AMD Software: Adrenalin Edition.
+# Auteur : ChatGPT (version robuste, durable et automatisée)
+# =====================================================================
+
+$ErrorActionPreference = 'Stop'
+Write-Host '🔍 Recherche de la dernière version AMD Adrenalin...'
+
+# Dossier cache (persistant entre exécutions)
+$cache = Join-Path $env:ProgramData 'AMD\AdrenalinCache'
+New-Item -ItemType Directory -Force -Path $cache | Out-Null
+
+# ---------------------------------------------------------------------
+# Étape 1 : Trouver la page de notes de version la plus récente
+# ---------------------------------------------------------------------
+[int]$year = [int](Get-Date -UFormat '%y')
+$latestPage = $null
+
+foreach ($yy in @([int]$year, [int]($year - 1))) {
+    foreach ($mm in (12..1)) {
+        foreach ($p in (3..1)) {
+            $slug = '{0}-{1:D2}-{2}' -f $yy, $mm, $p
+            $url = 'https://www.amd.com/en/resources/support-articles/release-notes/RN-RAD-WIN-{0}.html' -f $slug
+            try {
+                $r = Invoke-WebRequest -Method Head -UseBasicParsing -TimeoutSec 5 -Uri $url
+                if ($r.StatusCode -eq 200) {
+                    $latestPage = $url
+                    Write-Host ('✅ Page AMD trouvée : {0}' -f $url)
+                    break
+                }
+            } catch {}
+        }
+        if ($latestPage) { break }
+    }
+    if ($latestPage) { break }
+}
+
+if (-not $latestPage) { throw '❌ Impossible de trouver la page AMD la plus récente.' }
+
+# ---------------------------------------------------------------------
+# Étape 2 : Extraire le lien de téléchargement de l’installeur .exe
+# ---------------------------------------------------------------------
+Write-Host '🌐 Extraction du lien de téléchargement...'
+$page = Invoke-WebRequest -UseBasicParsing -Uri $latestPage
+$exe = ($page.Links | Where-Object href -match 'https?://drivers\.amd\.com/.*\.exe').href | Select-Object -First 1
+if (-not $exe) {
+    $m = [regex]::Match($page.Content, 'https?://drivers\.amd\.com/[^\s<>]+\.exe', 'IgnoreCase')
+    if ($m.Success) { $exe = $m.Value.Trim([char]34) }
+}
+if (-not $exe) { throw '❌ Aucun lien .exe trouvé sur la page AMD.' }
+
+Write-Host ('🔗 Lien détecté : {0}' -f $exe)
+
+# ---------------------------------------------------------------------
+# Étape 3 : Téléchargement via curl (plus fiable que Invoke-WebRequest)
+# ---------------------------------------------------------------------
+$fname = [System.IO.Path]::GetFileName(($exe -split '\?')[0])
+$dst = Join-Path $cache $fname
+
+function Download-AMDFile {
+    param([string]$url)
+    Write-Host ('⬇️ Téléchargement via curl : {0}' -f $url)
+    if (Test-Path $dst) { Remove-Item $dst -Force }
+    & curl.exe -L -f --retry 5 --retry-delay 5 `
+        -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' `
+        -e 'https://www.amd.com/' `
+        --output $dst $url
+}
+
+# Tentative HTTPS
+Download-AMDFile $exe
+
+# Vérifie la taille et retente en HTTP si besoin
+if ((Test-Path $dst) -and ((Get-Item $dst).Length -lt 1000000000)) {
+    Write-Warning '⚠️ Fichier trop petit, tentative HTTP...'
+    $altUrl = $exe -replace '^https://drivers', 'http://download'
+    Download-AMDFile $altUrl
+}
+
+# ---------------------------------------------------------------------
+# Étape 4 : Vérifications d’intégrité
+# ---------------------------------------------------------------------
+if (-not (Test-Path $dst)) { throw '❌ Téléchargement échoué : fichier introuvable.' }
+
+$size = (Get-Item $dst).Length
+if ($size -lt 1000000000) {
+    throw '❌ Téléchargement incomplet : fichier trop petit (<1 Go)'
+}
+Write-Host ('📦 Taille valide : {0} Mo' -f [math]::Round($size / 1MB))
+
+# Vérification de la signature numérique
+$sig = Get-AuthenticodeSignature $dst
+if ($sig.Status -ne 'Valid') {
+    Write-Warning ('⚠️ Signature numérique non valide : {0}' -f $sig.Status)
+} else {
+    Write-Host '🔒 Signature AMD valide.'
+}
+
+# ---------------------------------------------------------------------
+# Étape 5 : Lancer l’installation
+# ---------------------------------------------------------------------
+Write-Host '🚀 Lancement de l’installation de AMD Adrenalin...'
+Start-Process $dst
+Write-Host ('✅ Processus lancé : {0}' -f $dst)
+
+# =====================================================================
+# Fin du script
+# =====================================================================
+'@; $path = Join-Path $env:TEMP 'Install_AMD_Adrenalin.ps1'; Set-Content -Path $path -Value $script -Encoding UTF8; & powershell -NoProfile -ExecutionPolicy Bypass -File $path"
+""";
+
+        Packages.Add(
+            new SoftwarePackage(
+                "AMD Software Adrenalin",
+                "Custom.AMDSoftwareAdrenalin",
+                SoftwareInstallationMode.CustomCommand,
+                amdAdrenalinInstallCommand));
         Packages.Add(
             new SoftwarePackage(
                 "NVIDIA App",
