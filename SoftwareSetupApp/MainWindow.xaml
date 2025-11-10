@@ -355,12 +355,17 @@
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="220" />
                                                 </Grid.ColumnDefinitions>
-                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Grid.Column="0">
-                                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                <Grid Grid.Column="0" VerticalAlignment="Center">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <CheckBox Grid.Column="0"
+                                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                                               VerticalAlignment="Center"
                                                               Margin="0 0 12 0"
                                                               Foreground="{StaticResource NeutralForegroundBrush}" />
-                                                    <StackPanel Orientation="Vertical">
+                                                    <StackPanel Grid.Column="1" Orientation="Vertical">
                                                         <TextBlock Text="{Binding Name}"
                                                                    FontWeight="SemiBold"
                                                                    Foreground="{StaticResource NeutralForegroundBrush}"
@@ -372,7 +377,7 @@
                                                                    TextWrapping="Wrap"
                                                                    Visibility="{Binding Description, Converter={StaticResource StringNotNullOrEmptyToVisibilityConverter}}" />
                                                     </StackPanel>
-                                                </StackPanel>
+                                                </Grid>
                                                 <TextBlock Grid.Column="1"
                                                            Text="{Binding Status}"
                                                            HorizontalAlignment="Right"
