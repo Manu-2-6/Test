@@ -591,7 +591,7 @@ if ($target -ne [IntPtr]::Zero) {
                 "Nvidia App",
                 "Custom.NvidiaApp",
                 SoftwareInstallationMode.CustomCommand,
-                @"powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ""Start-Process PowerShell -Verb RunAs -ArgumentList '-NoProfile -ExecutionPolicy Bypass -Command ""& {Invoke-WebRequest -Uri ""https://us.download.nvidia.com/nvapp/client/latest/NVIDIA_app_latest.exe"" -OutFile ""$env:TEMP\NVIDIA_app_latest.exe""; Start-Process ""$env:TEMP\NVIDIA_app_latest.exe""}""'"""));
+                @"powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ""Start-Process PowerShell -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','& {Invoke-WebRequest -Uri ""https://us.download.nvidia.com/nvapp/client/latest/NVIDIA_app_latest.exe"" -OutFile ""$env:TEMP\NVIDIA_app_latest.exe""; Start-Process ""$env:TEMP\NVIDIA_app_latest.exe""}'"""));
 
         foreach (var package in Packages)
         {
