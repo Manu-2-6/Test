@@ -26,6 +26,9 @@ public class WingetInstaller
         (new Regex("\\bsuccessfully installed\\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), 95)
     };
 
+    private static readonly SemaphoreSlim SourceInitializationLock = new(1, 1);
+    private static readonly HashSet<string> InitializedSources = new(StringComparer.OrdinalIgnoreCase);
+
     public async Task<InstallationResult> InstallAsync(
         SoftwarePackage package,
         IProgress<string> progress,
@@ -37,7 +40,17 @@ public class WingetInstaller
             (BuildArguments("--id", package.PackageId, includeExact: false), $"l'identifiant \"{package.PackageId}\"")
         };
 
+        if (!string.IsNullOrWhiteSpace(package.WingetSearchQuery))
+        {
+            attempts.Add((BuildArguments("--name", package.WingetSearchQuery, includeExact: true), $"le nom \"{package.WingetSearchQuery}\""));
+        }
+
         var failureMessages = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(package.Source))
+        {
+            await EnsureSourceAvailableAsync(package.Source).ConfigureAwait(false);
+        }
 
         foreach (var (arguments, description) in attempts)
         {
@@ -113,6 +126,89 @@ public class WingetInstaller
             return builder.ToString();
         }
 
+        string NormalizeCommandMessage(WingetCommandResult result)
+        {
+            var message = !string.IsNullOrWhiteSpace(result.Error) ? result.Error : result.Output;
+            return NormalizeMessage(message);
+        }
+
+        async Task EnsureSourceAvailableAsync(string source)
+        {
+            await SourceInitializationLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (InitializedSources.Contains(source))
+                {
+                    return;
+                }
+
+                progress.Report($"[{package.Name}] Vérification de la source winget \"{source}\"...");
+
+                var updateArgs = new StringBuilder()
+                    .Append("source update --name \"")
+                    .Append(source)
+                    .Append("\" --accept-source-agreements --disable-interactivity")
+                    .ToString();
+
+                var updateResult = await ExecuteWingetCommandAsync(updateArgs, forwardOutput: false).ConfigureAwait(false);
+
+                if (updateResult.IsCanceled)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                if (updateResult.IsSuccess)
+                {
+                    InitializedSources.Add(source);
+                    return;
+                }
+
+                var updateMessage = NormalizeCommandMessage(updateResult);
+                if (!string.IsNullOrWhiteSpace(updateMessage))
+                {
+                    progress.Report(updateMessage);
+                }
+
+                progress.Report($"[{package.Name}] Activation de la source winget \"{source}\"...");
+
+                var enableArgs = new StringBuilder()
+                    .Append("source enable --name \"")
+                    .Append(source)
+                    .Append("\" --accept-source-agreements --disable-interactivity")
+                    .ToString();
+
+                var enableResult = await ExecuteWingetCommandAsync(enableArgs, forwardOutput: false).ConfigureAwait(false);
+
+                if (enableResult.IsCanceled)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                if (enableResult.IsSuccess)
+                {
+                    InitializedSources.Add(source);
+                    return;
+                }
+
+                var enableMessage = NormalizeCommandMessage(enableResult);
+                if (!string.IsNullOrWhiteSpace(enableMessage))
+                {
+                    progress.Report(enableMessage);
+                    failureMessages.Add(enableMessage);
+                }
+                else
+                {
+                    var fallback = $"[{package.Name}] Impossible de préparer la source winget \"{source}\".";
+                    progress.Report(fallback);
+                    failureMessages.Add(fallback);
+                }
+            }
+            finally
+            {
+                SourceInitializationLock.Release();
+            }
+        }
+
         async Task<InstallationResult> RunWingetInstallAsync(string arguments)
         {
             var commandResult = await ExecuteWingetCommandAsync(arguments, forwardOutput: true).ConfigureAwait(false);
@@ -127,11 +223,7 @@ public class WingetInstaller
                 return new InstallationResult(true, false, string.Empty);
             }
 
-            var message = !string.IsNullOrWhiteSpace(commandResult.Error)
-                ? commandResult.Error
-                : commandResult.Output;
-
-            message = NormalizeMessage(message);
+            var message = NormalizeCommandMessage(commandResult);
 
             return new InstallationResult(false, false, message);
         }
@@ -167,12 +259,7 @@ public class WingetInstaller
 
             if (!searchResult.IsSuccess)
             {
-                var message = !string.IsNullOrWhiteSpace(searchResult.Error)
-                    ? searchResult.Error
-                    : searchResult.Output;
-
-                message = NormalizeMessage(message);
-
+                var message = NormalizeCommandMessage(searchResult);
                 if (!string.IsNullOrWhiteSpace(message))
                 {
                     progress.Report(message);
