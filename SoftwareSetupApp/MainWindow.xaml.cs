@@ -404,6 +404,11 @@ if ($target -ne [IntPtr]::Zero) {
         ("Optimiser les lecteurs", OptimizeDrivesScript)
     };
 
+    private const string AmdAdrenalinInstallCommand =
+        """
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $cache=Join-Path $env:ProgramData 'AMD\AdrenalinCache'; New-Item -ItemType Directory -Force -Path $cache | Out-Null; [int]$year=[int](Get-Date -UFormat '%y'); $latestPage=$null; foreach ($yy in @([int]$year,[int]($year-1))) { foreach ($mm in (12..1)) { foreach ($p in (3..1)) { $slug='{0}-{1:D2}-{2}' -f $yy,$mm,$p; $url='https://www.amd.com/en/resources/support-articles/release-notes/RN-RAD-WIN-{0}.html' -f $slug; try { $r=Invoke-WebRequest -Method Head -UseBasicParsing -TimeoutSec 5 -Uri $url; if ($r.StatusCode -eq 200) { $latestPage=$url; break } } catch {} } if ($latestPage) { break } } if ($latestPage) { break } }; if (-not $latestPage) { throw 'Aucune page AMD trouvée.' }; $page=Invoke-WebRequest -UseBasicParsing -Uri $latestPage; $exe=($page.Links | Where-Object href -match 'https?://drivers\.amd\.com/.*\.exe').href | Select-Object -First 1; if (-not $exe) { $m=[regex]::Match($page.Content,'https?://drivers\.amd\.com/[^\s"<>]+\.exe','IgnoreCase'); if ($m.Success) { $exe=$m.Value } }; if (-not $exe) { throw 'Lien de téléchargement introuvable.' }; $fname=[System.IO.Path]::GetFileName(($exe -split '\?')[0]); $dst=Join-Path $cache $fname; function Download-AMDFile { param([string]$url); if (Test-Path $dst) { Remove-Item $dst -Force }; & curl.exe -L -f --retry 5 --retry-delay 5 -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' -e 'https://www.amd.com/' --output $dst $url }; Download-AMDFile $exe; if ((Test-Path $dst) -and ((Get-Item $dst).Length -lt 1000000000)) { $altUrl=$exe -replace '^https://drivers','http://download'; Download-AMDFile $altUrl }; if (-not (Test-Path $dst)) { throw 'Téléchargement échoué.' }; $size=(Get-Item $dst).Length; if ($size -lt 1000000000) { throw 'Téléchargement incomplet.' }; Start-Process $dst"
+""";
+
 
     private readonly WingetInstaller _installer = new();
     private readonly WindowsConfigurationExecutor _configurationExecutor = new();
@@ -591,6 +596,12 @@ if ($target -ne [IntPtr]::Zero) {
                 "Custom.NvidiaApp",
                 SoftwareInstallationMode.CustomCommand,
                 @"powershell -NoProfile -ExecutionPolicy Bypass -Command ""$landing='https://www.nvidia.com/en-us/software/nvidia-app/'; $h=Invoke-WebRequest -UseBasicParsing $landing; $exe=($h.Links | Where-Object href -match 'https://us\.download\.nvidia\.com/nvapp/client/[\d\.]+/NVIDIA_app_(beta_)?v[\d\.]+\.exe').href | Sort-Object { [version](($_ -split '/')[5]) } -Descending | Select-Object -First 1; if(-not $exe){ throw 'Impossible de trouver l''installeur NVIDIA App sur la page.' } $dst=Join-Path $env:TEMP 'NVIDIA_app_latest.exe'; Invoke-WebRequest -Uri $exe -OutFile $dst; if((Get-Item $dst).Length -lt 100000){ throw 'Téléchargement invalide: ' + $exe } if((Get-AuthenticodeSignature $dst).Status -ne 'Valid'){ throw 'Signature non valide: ' + $dst } Start-Process $dst"""));
+        Packages.Add(
+            new SoftwarePackage(
+                "AMD Software Adrenalin",
+                "Custom.AmdSoftwareAdrenalin",
+                SoftwareInstallationMode.CustomCommand,
+                AmdAdrenalinInstallCommand));
 
         foreach (var package in Packages)
         {
