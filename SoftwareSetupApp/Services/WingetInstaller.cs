@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -29,121 +31,191 @@ public class WingetInstaller
         IProgress<int>? percentProgress,
         CancellationToken cancellationToken)
     {
-        var argumentsBuilder = new StringBuilder();
-        argumentsBuilder.Append("install --id \"")
-            .Append(package.PackageId)
-            .Append("\" --silent --accept-package-agreements --accept-source-agreements");
-
-        if (!string.IsNullOrWhiteSpace(package.Source))
+        var attempts = new List<(string Arguments, string Description)>
         {
-            argumentsBuilder.Append(" --source \"")
-                .Append(package.Source)
-                .Append('"');
-        }
-
-        var arguments = argumentsBuilder.ToString();
-
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "winget",
-            Arguments = arguments,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
+            (BuildArguments("--id", package.PackageId, includeExact: false), $"l'identifiant \"{package.PackageId}\"")
         };
 
-        try
+        if (!string.IsNullOrWhiteSpace(package.WingetSearchQuery))
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            attempts.Add((BuildArguments("--name", package.WingetSearchQuery, includeExact: true), $"le nom \"{package.WingetSearchQuery}\""));
+        }
 
-            using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
-            var outputBuilder = new StringBuilder();
-            var errorBuilder = new StringBuilder();
+        var failureMessages = new List<string>();
 
-            var outputCompletion = new TaskCompletionSource<object?>();
-            var errorCompletion = new TaskCompletionSource<object?>();
-
-            percentProgress?.Report(0);
-            var lastReportedPercent = 0;
-
-            process.OutputDataReceived += (_, args) =>
+        foreach (var (arguments, description) in attempts)
+        {
+            if (failureMessages.Count > 0)
             {
-                if (args.Data == null)
-                {
-                    outputCompletion.TrySetResult(null);
-                    return;
-                }
-
-                outputBuilder.AppendLine(args.Data);
-                progress.Report($"[{package.Name}] {args.Data}");
-                TryReportPercentage(args.Data, percentProgress, ref lastReportedPercent);
-                TryReportDownloadSize(args.Data, percentProgress, ref lastReportedPercent);
-                TryReportStage(args.Data, percentProgress, ref lastReportedPercent);
-            };
-
-            process.ErrorDataReceived += (_, args) =>
-            {
-                if (args.Data == null)
-                {
-                    errorCompletion.TrySetResult(null);
-                    return;
-                }
-
-                errorBuilder.AppendLine(args.Data);
-                progress.Report($"[{package.Name}] {args.Data}");
-                TryReportPercentage(args.Data, percentProgress, ref lastReportedPercent);
-                TryReportDownloadSize(args.Data, percentProgress, ref lastReportedPercent);
-                TryReportStage(args.Data, percentProgress, ref lastReportedPercent);
-            };
-
-            if (!process.Start())
-            {
-                return new InstallationResult(false, false, $"[{package.Name}] Impossible de démarrer winget.");
+                progress.Report($"[{package.Name}] Nouvelle tentative via {description}.");
             }
 
-            using var registration = cancellationToken.Register(() =>
-            {
-                try
-                {
-                    if (!process.HasExited)
-                    {
-                        process.Kill(true);
-                    }
-                }
-                catch
-                {
-                    // Ignored
-                }
-            });
+            var result = await ExecuteWingetAsync(arguments).ConfigureAwait(false);
 
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
+            if (ShouldStopRetrying(result))
+            {
+                return result;
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.Message))
+            {
+                failureMessages.Add(result.Message);
+            }
+        }
+
+        var aggregatedMessage = failureMessages.Count > 0
+            ? string.Join(Environment.NewLine + Environment.NewLine, failureMessages.Distinct(StringComparer.Ordinal))
+            : $"[{package.Name}] L'installation a échoué.";
+
+        return new InstallationResult(false, false, aggregatedMessage);
+
+        string BuildArguments(string option, string identifier, bool includeExact)
+        {
+            var builder = new StringBuilder();
+            builder.Append("install ")
+                .Append(option)
+                .Append(' ')
+                .Append('"')
+                .Append(identifier)
+                .Append('"');
+
+            if (includeExact)
+            {
+                builder.Append(" --exact");
+            }
+
+            builder.Append(" --silent --accept-package-agreements --accept-source-agreements");
+
+            if (!string.IsNullOrWhiteSpace(package.Source))
+            {
+                builder.Append(" --source \"")
+                    .Append(package.Source)
+                    .Append('"');
+            }
+
+            return builder.ToString();
+        }
+
+        async Task<InstallationResult> ExecuteWingetAsync(string arguments)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "winget",
+                Arguments = arguments,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
 
             try
             {
-                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-                await Task.WhenAll(outputCompletion.Task, errorCompletion.Task).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+                var outputBuilder = new StringBuilder();
+                var errorBuilder = new StringBuilder();
+
+                var outputCompletion = new TaskCompletionSource<object?>();
+                var errorCompletion = new TaskCompletionSource<object?>();
+
+                percentProgress?.Report(0);
+                var lastReportedPercent = 0;
+
+                process.OutputDataReceived += (_, args) =>
+                {
+                    if (args.Data == null)
+                    {
+                        outputCompletion.TrySetResult(null);
+                        return;
+                    }
+
+                    outputBuilder.AppendLine(args.Data);
+                    progress.Report($"[{package.Name}] {args.Data}");
+                    TryReportPercentage(args.Data, percentProgress, ref lastReportedPercent);
+                    TryReportDownloadSize(args.Data, percentProgress, ref lastReportedPercent);
+                    TryReportStage(args.Data, percentProgress, ref lastReportedPercent);
+                };
+
+                process.ErrorDataReceived += (_, args) =>
+                {
+                    if (args.Data == null)
+                    {
+                        errorCompletion.TrySetResult(null);
+                        return;
+                    }
+
+                    errorBuilder.AppendLine(args.Data);
+                    progress.Report($"[{package.Name}] {args.Data}");
+                    TryReportPercentage(args.Data, percentProgress, ref lastReportedPercent);
+                    TryReportDownloadSize(args.Data, percentProgress, ref lastReportedPercent);
+                    TryReportStage(args.Data, percentProgress, ref lastReportedPercent);
+                };
+
+                if (!process.Start())
+                {
+                    return new InstallationResult(false, false, $"[{package.Name}] Impossible de démarrer winget.");
+                }
+
+                using var registration = cancellationToken.Register(() =>
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                        {
+                            process.Kill(true);
+                        }
+                    }
+                    catch
+                    {
+                        // Ignored
+                    }
+                });
+
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                try
+                {
+                    await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+                    await Task.WhenAll(outputCompletion.Task, errorCompletion.Task).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return new InstallationResult(false, true, $"[{package.Name}] Installation annulée.");
+                }
+
+                var output = outputBuilder.ToString().Trim();
+                var error = errorBuilder.ToString().Trim();
+                var message = string.IsNullOrWhiteSpace(error) ? output : error;
+
+                var isSuccess = process.ExitCode == 0;
+
+                return new InstallationResult(isSuccess, false, isSuccess ? string.Empty : message);
             }
-            catch (OperationCanceledException)
+            catch (Win32Exception)
             {
-                return new InstallationResult(false, true, $"[{package.Name}] Installation annulée.");
+                return new InstallationResult(false, false, "winget est introuvable sur ce poste.");
             }
-
-            var output = outputBuilder.ToString().Trim();
-            var error = errorBuilder.ToString().Trim();
-            var message = string.IsNullOrWhiteSpace(error) ? output : error;
-
-            var isSuccess = process.ExitCode == 0;
-
-            return new InstallationResult(isSuccess, false, isSuccess ? string.Empty : message);
         }
-        catch (Win32Exception)
+    }
+
+    private static bool ShouldStopRetrying(InstallationResult result)
+    {
+        if (result.IsSuccess || result.IsCanceled)
         {
-            return new InstallationResult(false, false, "winget est introuvable sur ce poste.");
+            return true;
         }
+
+        if (string.IsNullOrWhiteSpace(result.Message))
+        {
+            return false;
+        }
+
+        return result.Message.Contains("Impossible de démarrer winget", StringComparison.OrdinalIgnoreCase)
+            || result.Message.Contains("winget est introuvable", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void TryReportPercentage(string data, IProgress<int>? percentProgress, ref int lastReportedPercent)

@@ -586,8 +586,16 @@ if ($target -ne [IntPtr]::Zero) {
         Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
         Packages.Add(new SoftwarePackage("CPU-Z", "CPUID.CPU-Z"));
         Packages.Add(new SoftwarePackage("Driver Booster", "IObit.DriverBooster"));
-        Packages.Add(new SoftwarePackage("Nvidia App", "NVIDIACorporation.NVIDIAApp", source: "msstore"));
-        Packages.Add(new SoftwarePackage("AMD Software Adrenalin", "AdvancedMicroDevicesInc.AMDSoftwareAdrenalinEdition", source: "msstore"));
+        Packages.Add(new SoftwarePackage(
+            "Nvidia App",
+            "NVIDIACorporation.NVIDIAApp",
+            source: "msstore",
+            wingetSearchQuery: "NVIDIA App"));
+        Packages.Add(new SoftwarePackage(
+            "AMD Software Adrenalin",
+            "AdvancedMicroDevicesInc.AMDSoftwareAdrenalinEdition",
+            source: "msstore",
+            wingetSearchQuery: "AMD Software: Adrenalin Edition"));
 
         foreach (var package in Packages)
         {

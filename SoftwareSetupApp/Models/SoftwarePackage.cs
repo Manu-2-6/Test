@@ -24,7 +24,8 @@ public class SoftwarePackage : INotifyPropertyChanged
         SoftwareInstallationMode installationMode = SoftwareInstallationMode.Winget,
         string? customCommand = null,
         string? workingDirectory = null,
-        string? source = null)
+        string? source = null,
+        string? wingetSearchQuery = null)
     {
         Name = name;
         PackageId = packageId;
@@ -32,6 +33,7 @@ public class SoftwarePackage : INotifyPropertyChanged
         CustomCommand = customCommand;
         WorkingDirectory = workingDirectory;
         Source = source;
+        WingetSearchQuery = wingetSearchQuery;
     }
 
     public string Name { get; }
@@ -45,6 +47,8 @@ public class SoftwarePackage : INotifyPropertyChanged
     public string? WorkingDirectory { get; }
 
     public string? Source { get; }
+
+    public string? WingetSearchQuery { get; }
 
     public string? LogoPath
     {
