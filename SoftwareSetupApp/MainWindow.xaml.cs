@@ -591,7 +591,8 @@ if ($target -ne [IntPtr]::Zero) {
                 "Nvidia App",
                 "Custom.NvidiaApp",
                 SoftwareInstallationMode.CustomCommand,
-                @"curl -L ""https://us.download.nvidia.com/nvapp/client/latest/NVIDIA_app_latest.exe"" -o ""%TEMP%\NVIDIA_app_latest.exe"" && start %TEMP%\NVIDIA_app_latest.exe"));
+                @"Invoke-WebRequest -Uri ""https://us.download.nvidia.com/nvapp/client/latest/NVIDIA_app_latest.exe"" -OutFile ""$env:TEMP\NVIDIA_app_latest.exe""
+Start-Process ""$env:TEMP\NVIDIA_app_latest.exe"""));
 
         foreach (var package in Packages)
         {
