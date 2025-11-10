@@ -363,7 +363,8 @@
                                                     <StackPanel Orientation="Vertical">
                                                         <TextBlock Text="{Binding Name}"
                                                                    FontWeight="SemiBold"
-                                                                   Foreground="{StaticResource NeutralForegroundBrush}" />
+                                                                   Foreground="{StaticResource NeutralForegroundBrush}"
+                                                                   TextWrapping="Wrap" />
                                                         <TextBlock Text="{Binding Description}"
                                                                    Foreground="{StaticResource MutedForegroundBrush}"
                                                                    FontStyle="Italic"
