@@ -23,13 +23,15 @@ public class SoftwarePackage : INotifyPropertyChanged
         string packageId,
         SoftwareInstallationMode installationMode = SoftwareInstallationMode.Winget,
         string? customCommand = null,
-        string? workingDirectory = null)
+        string? workingDirectory = null,
+        string? source = null)
     {
         Name = name;
         PackageId = packageId;
         InstallationMode = installationMode;
         CustomCommand = customCommand;
         WorkingDirectory = workingDirectory;
+        Source = source;
     }
 
     public string Name { get; }
@@ -41,6 +43,8 @@ public class SoftwarePackage : INotifyPropertyChanged
     public string? CustomCommand { get; }
 
     public string? WorkingDirectory { get; }
+
+    public string? Source { get; }
 
     public string? LogoPath
     {
