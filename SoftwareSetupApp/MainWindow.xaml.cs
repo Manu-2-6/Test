@@ -585,6 +585,13 @@ if ($target -ne [IntPtr]::Zero) {
         Packages.Add(new SoftwarePackage("Mozilla Firefox", "Mozilla.Firefox"));
         Packages.Add(new SoftwarePackage("Adobe Acrobat Reader", "Adobe.Acrobat.Reader.64-bit"));
         Packages.Add(new SoftwarePackage("CPU-Z", "CPUID.CPU-Z"));
+        Packages.Add(new SoftwarePackage("Driver Booster", "IObit.DriverBooster"));
+        Packages.Add(
+            new SoftwarePackage(
+                "Nvidia App",
+                "Custom.NvidiaApp",
+                SoftwareInstallationMode.CustomCommand,
+                @"curl -L ""https://us.download.nvidia.com/nvapp/client/latest/NVIDIA_app_latest.exe"" -o ""%TEMP%\NVIDIA_app_latest.exe"" && start %TEMP%\NVIDIA_app_latest.exe"));
 
         foreach (var package in Packages)
         {
